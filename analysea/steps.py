@@ -8,6 +8,8 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import ruptures as rpt
+from scipy import interpolate
+from skimage.restoration import denoise_tv_chambolle
 
 from analysea.utils import detect_time_step
 
@@ -25,7 +27,7 @@ def step_function_ruptures(
     """
     # creation of data
     time_step = detect_time_step(df).total_seconds()
-    dt = int(3600 * 3 / time_step)  # one point 6 hours
+    dt = int(3600 * 6 / time_step)  # one point every 6 hours
     signal = np.array(df.interpolate().values[range(0, len(df), dt)])
 
     # Convert the signal to a 2D array as required by the ruptures library
@@ -40,13 +42,9 @@ def step_function_ruptures(
     stepx = np.insert(stepx, 0, 0)
     steps = []
     for i, istep in enumerate(stepx[:-1]):
-        step = np.nanmean(
-            signal[istep : stepx[i + 1]]
-        )  # mean for this part of the signal
+        step = np.nanmean(signal[istep : stepx[i + 1]])  # mean for this part of the signal
         steps.append(step)
-        stdd = np.nanstd(
-            signal[istep : stepx[i + 1]]
-        )  # std dev for this part of the signal
+        stdd = np.nanstd(signal[istep : stepx[i + 1]])  # std dev for this part of the signal
         # removing outliers for the calculation of the mean
         # because the calculation of the step is not perfect
         # this is because we downsample the signal to 3600*3 seconds ie 3 hours
@@ -56,3 +54,31 @@ def step_function_ruptures(
         #  spikes for the calculation of the mean
         res.iloc[istep * dt : stepx[i + 1] * dt] = stepp
     return res, stepx, steps
+
+
+def remove_steps_simple(df: pd.DataFrame, threshold: float) -> Tuple[pd.DataFrame, npt.NDArray[Any]]:
+    diff = np.diff(df.interpolate())
+    steps_ix = np.where(abs(diff) > threshold)[0]
+    step_function = pd.DataFrame(data=np.zeros(len(df)), index=df.index)
+    if steps_ix.size > 0:
+        steps_ix = np.insert(steps_ix, 0, 0)
+        steps_ix = np.insert(steps_ix, len(steps_ix), len(df) - 1)
+    # remove local mean for every step
+    for i, stepx in enumerate(steps_ix[0:-1]):
+        step = df.interpolate().iloc[stepx : steps_ix[i + 1]].mean()
+        step_function.iloc[stepx : steps_ix[i + 1]] = step
+    return step_function, steps_ix
+
+
+def step_function_TV(df: pd.DataFrame, weight: float = 1) -> Tuple[pd.DataFrame, npt.NDArray[Any]]:
+    idx = range(0, len(df), 200)
+    signal = np.array(df.interpolate())[idx]
+    signal_denoise = denoise_tv_chambolle(signal, weight=weight)  # adjust the parameters
+    # x_step = -2*np.cumsum(signal_denoise)
+    # step_indicator = x_step == x_step.max()
+    f = interpolate.interp1d(
+        idx, signal_denoise, fill_value="extrapolate"
+    )  # for extrapolation in last scipy version
+    res = pd.Series(data=f(range(len(df))), index=df.index)
+    #
+    return remove_steps_simple(res, res.std())

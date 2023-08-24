@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "analysea"
+version = "0.1.0"
+description = ""
+authors = ["Thomas Saillour <saillour.thomas@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+xarray = "^2023.8.0"
+pandas = "^2.0.3"
+geopandas = "^0.13.2"
+shapely = "^2.0.1"
+pyarrow = "^12.0.1"
+fastparquet = "^2023.7.0"
+ruptures = "^1.1.8"
+utide = "^0.3.0"
+owslib = "^0.29.2"
+matplotlib = "^3.7.2"
+cartopy = "^0.22.0"
+searvey = "^0.3.5"
+mypy = "^1.5.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.mypy]
+python_version = "3.10"
+plugins = ["pydantic.mypy"]
+show_error_codes = true
+show_column_numbers = true
+show_error_context = true
+warn_no_return = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_ignores = true
+strict = true
+ignore_missing_imports = true

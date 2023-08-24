@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from typing import cast
 from typing import Tuple
 
 import pandas as pd
@@ -14,10 +15,11 @@ def average(df: pd.DataFrame) -> pd.DataFrame:
     return df - df.mean()
 
 
-def detect_time_step(df: pd.DataFrame) -> Any:
+def detect_time_step(df: pd.DataFrame) -> pd.Timedelta:
     """
-    return the median time step of a dataframe"""
-    ts = df.index.to_series().diff().median()
+    return the median time step of a dataframe
+    """
+    ts = cast(pd.Timedelta, df.index.to_series().diff().median())
     if pd.isna(ts):
         msg = "Couldn't detect time step!"
         raise ValueError(msg)
@@ -31,7 +33,8 @@ def calculate_span(df: pd.DataFrame) -> Any:
 
 def calculate_completeness(df: pd.DataFrame) -> Any:
     """
-    return the completeness of a dataframe in %"""
+    return the completeness of a dataframe in %
+    """
     data_avail_ratio = 1 - df.resample("60min").mean().isna().sum() / len(
         df.resample("60min").mean()
     )
@@ -41,8 +44,6 @@ def calculate_completeness(df: pd.DataFrame) -> Any:
 # ======================
 # DATA SANITY FUNCTIONS
 # ======================
-
-
 def correct_unit(df: pd.DataFrame) -> Tuple[pd.DataFrame, bool]:
     flag = False
     for i in range(int(len(df) / 1000)):

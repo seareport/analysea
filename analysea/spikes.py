@@ -8,9 +8,7 @@ import pandas as pd
 import scipy as sp
 
 
-def despike_prominence(
-    df: pd.DataFrame, prominence: float
-) -> Tuple[Any, Any, pd.Series[Any]]:
+def despike_prominence(df: pd.DataFrame, prominence: float) -> Tuple[Any, Any, pd.Series[Any]]:
     """
     input:
     @df: pd.Series
@@ -21,9 +19,7 @@ def despike_prominence(
     @ipeaks: peaks indexes
     @peaks: peaks values
     """
-    ipeaks, props = sp.signal.find_peaks(
-        abs(df.interpolate()), prominence=prominence, width=1
-    )
+    ipeaks, props = sp.signal.find_peaks(abs(df.interpolate()), prominence=prominence, width=1)
     peaks = df.iloc[ipeaks]
     res = pd.Series(data=df.values, index=df.index)
     # erase depending on the width of the spike
@@ -47,9 +43,7 @@ def EWMA(df: pd.DataFrame, span: int) -> pd.DataFrame:
     return res
 
 
-def remove_spikes(
-    spikey: pd.DataFrame, averaged_signal: pd.DataFrame, delta: float
-) -> pd.DataFrame:
+def remove_spikes(spikey: pd.DataFrame, averaged_signal: pd.DataFrame, delta: float) -> pd.DataFrame:
     """
     method from https://stackoverflow.com/questions/37556487/remove-spikes-from-signal-in-python
     """

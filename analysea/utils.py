@@ -35,9 +35,7 @@ def calculate_completeness(df: pd.DataFrame) -> Any:
     """
     return the completeness of a dataframe in %
     """
-    data_avail_ratio = 1 - df.resample("60min").mean().isna().sum() / len(
-        df.resample("60min").mean()
-    )
+    data_avail_ratio = 1 - df.resample("60min").mean().isna().sum() / len(df.resample("60min").mean())
     return data_avail_ratio * 100
 
 
@@ -49,15 +47,11 @@ def correct_unit(df: pd.DataFrame) -> Tuple[pd.DataFrame, bool]:
     for i in range(int(len(df) / 1000)):
         if df.iloc[i * 1000 : (i + 1) * 1000].std() > 50:
             # most probably signal is in mm
-            df.iloc[i * 1000 : (i + 1) * 1000] = (
-                df.iloc[i * 1000 : (i + 1) * 1000] / 1000
-            )
+            df.iloc[i * 1000 : (i + 1) * 1000] = df.iloc[i * 1000 : (i + 1) * 1000] / 1000
             flag = True
         elif df.iloc[i * 1000 : (i + 1) * 1000].std() > 5:
             # most probably signal is in cm
-            df.iloc[i * 1000 : (i + 1) * 1000] = (
-                df.iloc[i * 1000 : (i + 1) * 1000] / 100
-            )
+            df.iloc[i * 1000 : (i + 1) * 1000] = df.iloc[i * 1000 : (i + 1) * 1000] / 100
             flag = True
     return df, flag
 

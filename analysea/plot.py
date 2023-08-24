@@ -84,9 +84,7 @@ def plot_gaps(
         if i == 0:
             ax.hlines(y=0, xmin=gaps.index[0], xmax=ig - gap, color="g", linewidth=10)
         else:
-            ax.hlines(
-                y=0, xmin=gaps.index[i - 1], xmax=ig - gap, color="g", linewidth=10
-            )
+            ax.hlines(y=0, xmin=gaps.index[i - 1], xmax=ig - gap, color="g", linewidth=10)
     #
     plt.tight_layout()
     fig.savefig(fileout)

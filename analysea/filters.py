@@ -15,9 +15,7 @@ from analysea.utils import detect_time_step
 def interp(df: pd.DataFrame, new_index: pd.Index[Any]) -> pd.DataFrame:
     """Return a new DataFrame with all columns values interpolated
     to the new_index values."""
-    df_out = pd.DataFrame(
-        data=np.interp(new_index, df.index, df.values), index=new_index
-    )
+    df_out = pd.DataFrame(data=np.interp(new_index, df.index, df.values), index=new_index)
     return df_out
 
 
@@ -68,17 +66,13 @@ def butter_filter(
     return b, a
 
 
-def butter_highpass_filter(
-    data: pd.DataFrame, cutoff: float, fs: float, order: int = 5
-) -> pd.DataFrame:
+def butter_highpass_filter(data: pd.DataFrame, cutoff: float, fs: float, order: int = 5) -> pd.DataFrame:
     b, a = butter_filter(cutoff, fs, "high", order=order)
     y = sp.signal.filtfilt(b, a, data)
     return pd.DataFrame(data=y, index=data.index)
 
 
-def butter_lowpass_filter(
-    data: pd.DataFrame, cutoff: float, fs: float, order: int = 5
-) -> pd.DataFrame:
+def butter_lowpass_filter(data: pd.DataFrame, cutoff: float, fs: float, order: int = 5) -> pd.DataFrame:
     b, a = butter_filter(cutoff, fs, "low", order=order)
     y = sp.signal.filtfilt(b, a, data)
     return pd.DataFrame(data=y, index=data.index)
@@ -92,9 +86,7 @@ def FIR_highpass(taps: int, cutoff: float, fs: float) -> Any:
     return b
 
 
-def FIR_highpass_filter(
-    data: pd.DataFrame, taps: int, cutoff: float, fs: float
-) -> pd.DataFrame:
+def FIR_highpass_filter(data: pd.DataFrame, taps: int, cutoff: float, fs: float) -> pd.DataFrame:
     # fs : sampling frequency
     # cutoff : cutoff frequency
     # width of the anylisis window
@@ -103,9 +95,7 @@ def FIR_highpass_filter(
     return pd.DataFrame(data=y, index=data.index)
 
 
-def clip_data(
-    unclipped: pd.DataFrame, high_clip: float, low_clip: float
-) -> pd.DataFrame:
+def clip_data(unclipped: pd.DataFrame, high_clip: float, low_clip: float) -> pd.DataFrame:
     """Clip unclipped between high_clip and low_clip.
     unclipped contains a single column of unclipped data."""
     # convert to np.array to access the np.where method

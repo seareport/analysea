@@ -157,8 +157,6 @@ def yearly_tide_analysis(
     coefs = []
     for i in range(n_years):
         if i == n_years - 1:
-            if log:
-                print("  => Analyse last year")
             signal = pd.DataFrame(
                 h[lambda x: (x.index > t_tmp) & (x.index < max_time)],
                 index=h[lambda x: (x.index > t_tmp) & (x.index < max_time)].index,
@@ -170,23 +168,13 @@ def yearly_tide_analysis(
                 tide = pd.concat([tide, tide_tmp])
                 surge = pd.concat([surge, surge_tmp])
             t_tmp += pd.Timedelta(days=split_period)
-            if log:
-                print("   +> ", len(tide), "/", len(h), "records done")
         else:
-            if log:
-                print("  => Analyse year", i, "of", n_years)
             signal = pd.DataFrame(
-                h[
-                    lambda x: (x.index > t_tmp)
-                    & (x.index < t_tmp + pd.Timedelta(days=split_period))
-                ],
+                h[lambda x: (x.index > t_tmp) & (x.index < t_tmp + pd.Timedelta(days=split_period))],
                 index=h[
-                    lambda x: (x.index > t_tmp)
-                    & (x.index < t_tmp + pd.Timedelta(days=split_period))
+                    lambda x: (x.index > t_tmp) & (x.index < t_tmp + pd.Timedelta(days=split_period))
                 ].index,
             )
-            if log:
-                print(calculate_completeness(signal))
             if calculate_completeness(signal) > 70:
                 years.append(t_tmp.year)
                 tide_tmp, surge_tmp, coef = tide_analysis(signal, kwargs)
@@ -194,17 +182,9 @@ def yearly_tide_analysis(
                 tide = pd.concat([tide, tide_tmp])
                 surge = pd.concat([surge, surge_tmp])
             t_tmp += pd.Timedelta(days=split_period)
-            if log:
-                print("   +> ", len(tide), "/", len(h), "records done")
-
-    tide = (
-        tide.reset_index()
-        .drop_duplicates(subset="index", keep="last")
-        .set_index("index")
-    )
-    surge = (
-        surge.reset_index()
-        .drop_duplicates(subset="index", keep="last")
-        .set_index("index")
-    )
+        if log:
+            print("  => Analyse year", i, "of", n_years)
+            print("   +> ", len(tide), "/", len(h), "records done")
+    tide = tide.reset_index().drop_duplicates(subset="index", keep="last").set_index("index")
+    surge = surge.reset_index().drop_duplicates(subset="index", keep="last").set_index("index")
     return tide, surge, coefs, years

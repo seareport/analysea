@@ -18,7 +18,7 @@ from analysea.utils import detect_time_step
 # STEP FUNCTIONS
 # ===================
 def step_function_ruptures(
-    df: pd.DataFrame, penalty: int = 10
+    df: pd.DataFrame, penalty: int = 10, subsampHours: int = 3
 ) -> Tuple[pd.DataFrame, npt.NDArray[Any], List[int]]:
     """
     from the ruptures package
@@ -27,13 +27,14 @@ def step_function_ruptures(
     """
     # creation of data
     time_step = detect_time_step(df).total_seconds()
-    dt = int(3600 * 6 / time_step)  # one point every 6 hours
+    dt = int(3600 * subsampHours / time_step)  # one point every 6 hours
     signal = np.array(df.interpolate().values[range(0, len(df), dt)])
+    # signal = lttb.downsample(np.array([range(len(df)), df.interpolate().values]).T,n_out= dt)
 
     # Convert the signal to a 2D array as required by the ruptures library
     signal_2d = signal.reshape(-1, 1)
 
-    c = rpt.costs.CostL1().fit(signal)
+    c = rpt.costs.CostL2().fit(signal)
     # Perform change point detection using Potts model
     algo = rpt.Pelt(custom_cost=c).fit(signal_2d)
     stepx = algo.predict(pen=penalty)
@@ -53,7 +54,7 @@ def step_function_ruptures(
         stepp = np.nanmean(signal[istep : stepx[i + 1]][idx[0]])
         #  spikes for the calculation of the mean
         res.iloc[istep * dt : stepx[i + 1] * dt] = stepp
-    return res, stepx, steps
+    return res, stepx * dt, steps
 
 
 def remove_steps_simple(df: pd.DataFrame, threshold: float) -> Tuple[pd.DataFrame, npt.NDArray[Any]]:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 from typing import cast
 from typing import Tuple
+from typing import Union
 
 import pandas as pd
 
@@ -31,7 +32,7 @@ def calculate_span(df: pd.DataFrame) -> Any:
     return df.index.to_series().diff().sum()
 
 
-def calculate_completeness(df: pd.DataFrame) -> Any:
+def calculate_completeness(df: Union[pd.DataFrame, pd.Series[Any]]) -> Any:
     """
     return the completeness of a dataframe in %
     """

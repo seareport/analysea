@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import os
 import sys
 
@@ -21,7 +22,7 @@ from analysea.utils import detect_gaps
 # ===================
 # load in data information
 IOC_STATIONS = ioc.get_ioc_stations()
-IOC_CODE = "wlgt"
+IOC_CODE = "acap2"
 
 # tidal analysis options
 OPTS = {
@@ -83,7 +84,6 @@ ASTRO_WRITE = [
 
 # main call
 def main():
-    # here is the IOC code
     # fmt: off
     _ioc_index = np.where(IOC_STATIONS.ioc_code == IOC_CODE)[0][0]
     df0 = pd.read_parquet(os.path.join( "tests/data", IOC_CODE + ".gzip"))
@@ -98,22 +98,23 @@ def main():
     df["slevel"] = remove_numerical(df0.slevel)
     df["correct"], _ = correct_unit(df.slevel)
     df["step"], stepsx, steps = step_function_ruptures(df.correct)
-    if (len(stepsx) > 2) & (np.max(steps) > 1.0):
-        # if step are not bigger than 1 meter
-        df.correct = df.slevel - df.step
     threshold = np.max([1,df.correct.std() * 3])
+    if (len(stepsx) > 2) and (np.max(steps) > 1.0):
+        ipeaks, peaks, df['correct'] = despike_prominence(df.correct - df.step, threshold) # despike once already
     _, _, df["anomaly"] = despike_prominence(df.correct, threshold)
-    _, _, big_gaps = detect_gaps(df)
-    plot_gaps(df.anomaly.interpolate(), big_gaps, filenameOutGaps)
     # assign parameters for tide analysis
     if signaltonoise(df.slevel) < 0:
         df["filtered"] = filter_fft(df.anomaly)
         df.anomaly = df.filtered
+    # detect big gaps
+    _, _, big_gaps = detect_gaps(df)
+    plot_gaps(df.anomaly, big_gaps, filenameOutGaps)
     #
     OPTS["lat"] = lat
-    df["tide"], df["surge"], coefs, years = yearly_tide_analysis(df.anomaly, 365, OPTS)
-    plot_multiyear_tide_analysis(ASTRO_PLOT, coefs, years, lat, lon, df, title, filenameOut)
-    plot_multiyear_tide_analysis(ASTRO_PLOT, coefs, years, lat, lon, df, title, filenameOut, zoom=True)
+    df1 = df.reset_index().drop_duplicates(subset="time", keep="last").set_index("time")
+    df1["tide"], df1["surge"], coefs, years = yearly_tide_analysis(df1.anomaly, 365, OPTS)
+    plot_multiyear_tide_analysis(ASTRO_PLOT, coefs, years, lat, lon, df1, title, filenameOut)
+    plot_multiyear_tide_analysis(ASTRO_PLOT, coefs, years, lat, lon, df1, title, filenameOut, zoom=True)
     # fmt: on
 
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

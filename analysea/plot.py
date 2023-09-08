@@ -20,6 +20,7 @@ from matplotlib.gridspec import GridSpec
 
 from analysea.tide import demean_amps_phases
 from analysea.tide import get_const_amps_labels
+from analysea.utils import calculate_completeness
 
 # ===================
 # global variables
@@ -78,7 +79,7 @@ def plot_gaps(
     df: pd.DataFrame, gaps: pd.Series[Any], fileout: str
 ) -> Tuple[None, matplotlib.pyplot.figure]:
     fig, ax = plt.subplots(figsize=(19, 10))
-    df.plot(ax=ax)
+    df.interpolate().plot(ax=ax)
     for i, (ig, gap) in enumerate(gaps.items()):
         ax.hlines(y=0, xmin=ig - gap, xmax=ig, color="r", linewidth=30)
         if i == 0:
@@ -86,8 +87,18 @@ def plot_gaps(
         else:
             ax.hlines(y=0, xmin=gaps.index[i - 1], xmax=ig - gap, color="g", linewidth=10)
     #
+    textStr = "\n".join(
+        (
+            f"{len(gaps)} bigs gaps with average gap duration: {gaps.mean()}",
+            f"with the biggest gap being : {gaps.max()}",
+            f"completeness: {np.round(calculate_completeness(df),2)}%",
+        )
+    )
+    props = dict(boxstyle="round", facecolor="white", alpha=0.7)
+    ax.text(0.7, 0.1, textStr, transform=ax.transAxes, fontsize=10, verticalalignment="top", bbox=props)
     plt.tight_layout()
     fig.savefig(fileout)
+    plt.close()
     return fig, ax
 
 
@@ -112,7 +123,7 @@ def plot_multiyear_tide_analysis(
     # min_time = pd.Timestamp(df.index.min())
     # max_time = pd.Timestamp(df.index.max())
     if zoom:
-        df = df.iloc[:10000]
+        df = df.loc[: df.index[0] + pd.Timedelta(days=60)]
     ax0.plot(df.index, df["anomaly"], label="Raw Signal", color="k", linestyle="-.")
     ax0.plot(df.index, df["tide"], label="Yearly Tide Fit", color="green")
     ax0.plot(df.index, df["surge"], label="Residual Yearly", color="cyan")
@@ -191,3 +202,4 @@ def plot_multiyear_tide_analysis(
     gl.xformatter = LONGITUDE_FORMATTER
     gl.yformatter = LATITUDE_FORMATTER
     fig.savefig(fileout)
+    plt.close()

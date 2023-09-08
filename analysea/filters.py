@@ -12,10 +12,10 @@ import scipy as sp
 from analysea.utils import detect_time_step
 
 
-def interp(df: pd.DataFrame, new_index: pd.Index[Any]) -> pd.DataFrame:
+def interp(df: pd.Series[Any], new_index: pd.Index[Any]) -> pd.DataFrame:
     """Return a new DataFrame with all columns values interpolated
     to the new_index values."""
-    df_out = pd.DataFrame(data=np.interp(new_index, df.index, df.values), index=new_index)
+    df_out = pd.DataFrame(data=np.interp(new_index, df.index, df), index=new_index)
     return df_out
 
 
@@ -35,7 +35,7 @@ def filter_fft(df: pd.DataFrame) -> pd.DataFrame:
     # suppressing everything passed the 10th harmonic
     # (first one being the semi-diurnal consituent of the tide)
     temp_slow = np.real(sp.fftpack.ifft(temp_fft_bis))
-    res = pd.DataFrame(data=temp_slow, index=df[~df.isna()].index)
+    res = pd.Series(temp_slow, index=df[~df.isna()].index)
     return interp(res, df.index)
 
 

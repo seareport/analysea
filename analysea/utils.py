@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 from typing import cast
+from typing import Dict
 from typing import Tuple
 from typing import Union
 
+import numpy as np
 import pandas as pd
 
 # ===================
@@ -32,7 +34,7 @@ def calculate_span(df: pd.DataFrame) -> Any:
     return df.index.to_series().diff().sum()
 
 
-def calculate_completeness(df: Union[pd.DataFrame, pd.Series[Any]]) -> Any:
+def completeness(df: Union[pd.DataFrame, pd.Series[Any]]) -> Any:
     """
     return the completeness of a dataframe in %
     """
@@ -66,3 +68,16 @@ def detect_gaps(
     small_gaps = gaps[gaps < pd.Timedelta(1, "hours")]
     big_gaps = gaps[gaps > pd.Timedelta(1, "hours")]
     return gaps, small_gaps, big_gaps
+
+
+def json_format(d: Dict[Any, Any]) -> Dict[Any, Any]:
+    for key, value in d.items():
+        if isinstance(value, dict):
+            json_format(value)  # Recurse into nested dictionaries
+        elif isinstance(value, np.ndarray):
+            d[key] = value.tolist()  # Convert NumPy array to list
+        elif isinstance(value, pd.Timestamp):
+            d[key] = value.strftime("%Y-%m-%d %H:%M:%S")  # Convert pandas Timestamp to string
+        elif isinstance(value, pd.Timedelta):
+            d[key] = str(value)  # Convert pandas Timedelta to string
+    return d

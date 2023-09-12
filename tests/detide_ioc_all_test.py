@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 from searvey import ioc
 
-from analysea.filters import filter_fft
 from analysea.filters import remove_numerical
 from analysea.filters import signaltonoise
 from analysea.plot import plot_gaps
@@ -16,9 +15,10 @@ from analysea.spikes import despike_prominence
 from analysea.steps import step_function_ruptures
 from analysea.tide import demean_amps_phases
 from analysea.tide import yearly_tide_analysis
-from analysea.utils import calculate_completeness
+from analysea.utils import completeness
 from analysea.utils import correct_unit
 from analysea.utils import detect_gaps
+from analysea.utils import json_format
 
 # ===================
 # global variables
@@ -87,7 +87,7 @@ ASTRO_WRITE = [
     "MN4",
 ]
 
-IOC_STATIONS_OUT = pd.DataFrame(IOC_STATIONS)
+IOC_OUT = pd.DataFrame(IOC_STATIONS)
 
 
 # main call
@@ -97,15 +97,24 @@ def main():
             print("   > _ioc_file = ", _ioc_file)
             # here is the IOC case
             _ioc_code = os.path.splitext(_ioc_file)[0]
-            _ioc_index = np.where(IOC_STATIONS_OUT.ioc_code == _ioc_code)[0][0]
+            _ioc_index = np.where(IOC_OUT.ioc_code == _ioc_code)[0][0]
             df0 = pd.read_parquet(os.path.join(DATA_FOLDER, "data", _ioc_code + ".gzip"))
             # fill already some info
-            lat = IOC_STATIONS_OUT.iloc[_ioc_index].lat
-            lon = IOC_STATIONS_OUT.iloc[_ioc_index].lon
-            title = IOC_STATIONS_OUT.iloc[_ioc_index].location
+            lat = IOC_OUT.iloc[_ioc_index].lat
+            lon = IOC_OUT.iloc[_ioc_index].lon
+            title = IOC_OUT.iloc[_ioc_index].location
             filenameOut = os.path.join("./tests/data/graphs", _ioc_code + ".png")
             filenameOutGaps = os.path.join("./tests/data/graphs", _ioc_code + "_gaps.png")
             OPTS["lat"] = lat
+            # start completing the json export file
+            js_1 = dict()
+            js_1["lat"] = lat
+            js_1["lon"] = lon
+            min_time = pd.Timestamp(df0.index.min())
+            max_time = pd.Timestamp(df0.index.max())
+            js_1["first_obs"] = min_time
+            js_1["last_obs"] = max_time
+
             # check if the file exists
             if os.path.exists(filenameOut):
                 print("   > file ", filenameOut, " already exists")
@@ -123,64 +132,80 @@ def main():
                     )  # despike once already
                 _, _, df["anomaly"] = despike_prominence(df.correct, threshold)
                 # calculate completeness
-                if calculate_completeness(df.anomaly) < 70:
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["analysis"]] = "Failed: missing data"
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["missing"]] = 100 - np.round(
-                        calculate_completeness(df.anomaly), 2
-                    )
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["analysed"]] = False
-                    print("completeness < 70% :", calculate_completeness(df.anomaly))
+                cpltness = completeness(df.anomaly)
+                missing = 100 - np.round(cpltness, 2)
+                if cpltness < 70:
+                    IOC_OUT.loc[_ioc_index, ["analysis"]] = "Failed: < 70% completeness"
+                    IOC_OUT.loc[_ioc_index, ["missing"]] = missing
+                    IOC_OUT.loc[_ioc_index, ["analysed"]] = False
+                    #
+                    js_1["analysis"] = "Failed: missing data"
+                    js_1["missing"] = missing
+                    js_1["analysed"] = False
+                    #
+                    print("completeness < 70% :", cpltness)
+                    with open(f"./tests/data/processed/{_ioc_code}.json", "w") as f:
+                        json.dump(json_format(js_1), f, indent=2)
                     continue
                 #
-                min_time = pd.Timestamp(df.index.min())
-                max_time = pd.Timestamp(df.index.max())
                 if (max_time - min_time).days < 365:
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["analysis"]] = "Failed: time span less than a year"
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["missing"]] = 100 - np.round(
-                        calculate_completeness(df.anomaly), 2
-                    )
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["analysed"]] = False
+                    IOC_OUT.loc[_ioc_index, ["analysis"]] = "Failed: not enough data"
+                    IOC_OUT.loc[_ioc_index, ["missing"]] = missing
+                    IOC_OUT.loc[_ioc_index, ["analysed"]] = False
+                    #
+                    js_1["analysis"] = "Failed: missing data"
+                    js_1["missing"] = missing
+                    js_1["analysed"] = False
+                    #
                     print("ignore : period is less than a year:", (max_time - min_time).days, "days")
+                    with open(f"./tests/data/processed/{_ioc_code}.json", "w") as f:
+                        json.dump(json_format(js_1), f, indent=2)
                     continue
                 else:
-                    # assign parameters for tide analysis
-                    if signaltonoise(df.slevel) < 0:
-                        df["filtered"] = filter_fft(df.anomaly)
-                        df.anomaly = df.filtered
                     # detect big gaps
                     gaps, small_gaps, big_gaps = detect_gaps(df)
                     plot_gaps(df.anomaly, big_gaps, filenameOutGaps)
                     # assign parameters before running tides (eventual crash)
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["missing"]] = 100 - np.round(
-                        calculate_completeness(df.anomaly), 2
-                    )
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["biggest_gap"]] = str(big_gaps.max())
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["total_gaps"]] = len(gaps)
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["steps"]] = len(stepsx)
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["snr"]] = (signaltonoise(df.slevel),)
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["unit_flag"]] = units_flag
+                    IOC_OUT.loc[_ioc_index, ["missing"]] = 100 - np.round(cpltness, 2)
+                    IOC_OUT.loc[_ioc_index, ["biggest_gap"]] = str(big_gaps.max())
+                    IOC_OUT.loc[_ioc_index, ["total_gaps"]] = len(gaps)
+                    IOC_OUT.loc[_ioc_index, ["steps"]] = len(stepsx)
+                    IOC_OUT.loc[_ioc_index, ["snr"]] = (signaltonoise(df.slevel),)
+                    IOC_OUT.loc[_ioc_index, ["unit_flag"]] = units_flag
+                    #
+                    js_1["missing"] = 100 - np.round(cpltness, 2)
+                    js_1["biggest_gap"] = str(big_gaps.max())
+                    js_1["total_gaps"] = len(gaps)
+                    js_1["steps"] = len(stepsx)
+                    js_1["snr"] = (signaltonoise(df.slevel),)
+                    js_1["unit_flag"] = units_flag
                     #
                     df1 = df.reset_index().drop_duplicates(subset="time", keep="last").set_index("time")
                     df1["tide"], df1["surge"], coefs, years = yearly_tide_analysis(df1.anomaly, 365, OPTS)
                     # save figures
                     if len(coefs) == 0:
-                        IOC_STATIONS_OUT.iloc[_ioc_index]["analysis"] = "Failed: missing data"
+                        IOC_OUT.iloc[_ioc_index]["analysis"] = js_1["analysis"] = "Failed: during tides"
+                        with open(f"./tests/data/processed/{_ioc_code}.json", "w") as f:
+                            json.dump(js_1, f, indent=2)
                         continue
                     # printing out results
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["perc_analysed"]] = (
+                    IOC_OUT.loc[_ioc_index, ["perc_analysed"]] = js_1["perc_analysed"] = (
                         len(df1.surge) / len(df.slevel) * 100
                     )
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["analysis"]] = "Success"
-                    IOC_STATIONS_OUT.loc[_ioc_index, ["analysed"]] = True
-                    with open(f"./data/processed/{_ioc_code}.json", "w") as fp:
-                        json.dump(
-                            {
-                                "const": ASTRO_WRITE,
-                                "amps": demean_amps_phases(coefs, ASTRO_WRITE)[0].tolist(),
-                                "phases": demean_amps_phases(coefs, ASTRO_WRITE)[1].tolist(),
-                            },
-                            fp,
-                        )
+                    IOC_OUT.loc[_ioc_index, ["analysis"]] = js_1["analysis"] = "Success"
+                    IOC_OUT.loc[_ioc_index, ["analysed"]] = js_1["analysed"] = True
+                    # save the coefs calculated and average them
+                    const, mean_amps, mean_phases = demean_amps_phases(coefs, coefs[0]["name"])
+                    js_out = json_format(coefs[-1])
+                    js_1 = json_format(js_1)
+                    js_out["weights"] = 0  # weights list is too long and unused in the reconstruction
+                    js_out["A"] = mean_amps.tolist()
+                    js_out["g"] = mean_phases.tolist()
+                    for key in js_1.keys():
+                        js_out[key] = js_1[key]
+                    with open(f"tests/data/processed/{_ioc_code}.json", "w") as fp:
+                        json.dump(js_out, fp)
+
                     out = pd.DataFrame(data=df1.surge, index=df1.index)
                     out.to_parquet(f"./data/processed/{_ioc_code}_surge.gzip", compression="gzip")
                     # plots
@@ -193,14 +218,12 @@ def main():
 
             except Exception as e:
                 print("Error: ", e)
-                IOC_STATIONS_OUT.loc[_ioc_index, ["first_obs"]] = (
-                    pd.Timestamp(df0.index.min()).strftime("%Y-%m-%dT%H:%M:%S"),
-                )
-                IOC_STATIONS_OUT.loc[_ioc_index, ["last_obs"]] = (
-                    pd.Timestamp(df0.index.max()).strftime("%Y-%m-%dT%H:%M:%S"),
-                )
-                IOC_STATIONS_OUT.loc[_ioc_index, ["analysed"]] = False
-            IOC_STATIONS_OUT.to_parquet("ioc_stations_api_analysed.gzip")
+                IOC_OUT.loc[_ioc_index, ["first_obs"]] = min_time.strftime("%Y-%m-%dT%H:%M:%S")
+                IOC_OUT.loc[_ioc_index, ["last_obs"]] = (max_time.strftime("%Y-%m-%dT%H:%M:%S"),)
+                IOC_OUT.loc[_ioc_index, ["analysed"]] = False
+            IOC_OUT.to_parquet("IOC_api_analysed.gzip")
+            with open(f"./data/processed/{_ioc_code}.json", "w") as fp:
+                json.dump(json_format(js_1), f, indent=2)
 
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     # ~~~~ Jenkins' success message ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

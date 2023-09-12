@@ -15,7 +15,7 @@ from analysea.spikes import despike_prominence
 from analysea.steps import step_function_ruptures
 from analysea.tide import demean_amps_phases
 from analysea.tide import yearly_tide_analysis
-from analysea.utils import calculate_completeness
+from analysea.utils import completeness
 from analysea.utils import correct_unit
 from analysea.utils import detect_gaps
 
@@ -129,22 +129,18 @@ def main():
                 )  # despike once already
             _, _, df["anomaly"] = despike_prominence(df.correct, threshold)
             # calculate completeness
-            if calculate_completeness(df.anomaly) < 70:
+            if completeness(df.anomaly) < 70:
                 GESLA_STATIONS.loc[_gesla_index, ["analysis"]] = "Failed: missing data"
-                GESLA_STATIONS.loc[_gesla_index, ["missing"]] = 100 - np.round(
-                    calculate_completeness(df.anomaly), 2
-                )
+                GESLA_STATIONS.loc[_gesla_index, ["missing"]] = 100 - np.round(completeness(df.anomaly), 2)
                 GESLA_STATIONS.loc[_gesla_index, ["analysed"]] = False
-                print("completeness < 70% :", calculate_completeness(df.anomaly))
+                print("completeness < 70% :", completeness(df.anomaly))
                 continue
             #
             min_time = pd.Timestamp(df.index.min())
             max_time = pd.Timestamp(df.index.max())
             if (max_time - min_time).days < 365:
                 GESLA_STATIONS.loc[_gesla_index, ["analysis"]] = "Failed: time span less than a year"
-                GESLA_STATIONS.loc[_gesla_index, ["missing"]] = 100 - np.round(
-                    calculate_completeness(df.anomaly), 2
-                )
+                GESLA_STATIONS.loc[_gesla_index, ["missing"]] = 100 - np.round(completeness(df.anomaly), 2)
                 GESLA_STATIONS.loc[_gesla_index, ["analysed"]] = False
                 print("ignore : period is less than a year:", (max_time - min_time).days, "days")
                 continue
@@ -157,9 +153,7 @@ def main():
                 gaps, small_gaps, big_gaps = detect_gaps(df)
                 plot_gaps(df.anomaly, big_gaps, filenameOutGaps)
                 # assign parameters before running tides (eventual crash)
-                GESLA_STATIONS.loc[_gesla_index, ["missing"]] = 100 - np.round(
-                    calculate_completeness(df.anomaly), 2
-                )
+                GESLA_STATIONS.loc[_gesla_index, ["missing"]] = 100 - np.round(completeness(df.anomaly), 2)
                 GESLA_STATIONS.loc[_gesla_index, ["biggest_gap"]] = str(big_gaps.max())
                 GESLA_STATIONS.loc[_gesla_index, ["total_gaps"]] = len(gaps)
                 GESLA_STATIONS.loc[_gesla_index, ["steps"]] = len(stepsx)

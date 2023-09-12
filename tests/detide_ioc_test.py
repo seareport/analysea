@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import json
 import os
 import sys
 
@@ -6,16 +7,16 @@ import numpy as np
 import pandas as pd
 from searvey import ioc
 
-from analysea.filters import filter_fft
 from analysea.filters import remove_numerical
-from analysea.filters import signaltonoise
 from analysea.plot import plot_gaps
 from analysea.plot import plot_multiyear_tide_analysis
 from analysea.spikes import despike_prominence
 from analysea.steps import step_function_ruptures
+from analysea.tide import demean_amps_phases
 from analysea.tide import yearly_tide_analysis
 from analysea.utils import correct_unit
 from analysea.utils import detect_gaps
+from analysea.utils import json_format
 
 # ===================
 # global variables
@@ -91,6 +92,18 @@ def main():
     lat = IOC_STATIONS.iloc[_ioc_index].lat
     lon = IOC_STATIONS.iloc[_ioc_index].lon
     title = IOC_STATIONS.iloc[_ioc_index].location
+    OPTS["lat"] = lat
+
+    # start completing the json export file
+    js_1 =  dict()
+    js_1['lat'] = lat
+    js_1['lon'] = lon
+    min_time = pd.Timestamp(df0.index.min())
+    max_time = pd.Timestamp(df0.index.max())
+    js_1['first_obs'] = min_time
+    js_1['last_obs'] =  max_time
+    js_1 = json_format(js_1)
+
     filenameOutGaps = os.path.join('tests/data/graphs', IOC_CODE + "_gaps.png")
     filenameOut = os.path.join('tests/data/graphs', IOC_CODE + ".png")
     #
@@ -102,19 +115,25 @@ def main():
     if (len(stepsx) > 2) and (np.max(steps) > 1.0):
         ipeaks, peaks, df['correct'] = despike_prominence(df.correct - df.step, threshold) # despike once already
     _, _, df["anomaly"] = despike_prominence(df.correct, threshold)
-    # assign parameters for tide analysis
-    if signaltonoise(df.slevel) < 0:
-        df["filtered"] = filter_fft(df.anomaly)
-        df.anomaly = df.filtered
     # detect big gaps
     _, _, big_gaps = detect_gaps(df)
     plot_gaps(df.anomaly, big_gaps, filenameOutGaps)
     #
-    OPTS["lat"] = lat
     df1 = df.reset_index().drop_duplicates(subset="time", keep="last").set_index("time")
     df1["tide"], df1["surge"], coefs, years = yearly_tide_analysis(df1.anomaly, 365, OPTS)
     plot_multiyear_tide_analysis(ASTRO_PLOT, coefs, years, lat, lon, df1, title, filenameOut)
     plot_multiyear_tide_analysis(ASTRO_PLOT, coefs, years, lat, lon, df1, title, filenameOut, zoom=True)
+    # save the coefs calculated and average them
+    const, mean_amps,mean_phases = demean_amps_phases(coefs, coefs[0]['name'])
+    js_out = json_format(coefs[-1])
+    js_out['weights'] = 0 # weights list is too long and unused in the reconstruction
+    js_out['A'] = mean_amps.tolist()
+    js_out['g'] = mean_phases.tolist()
+    # js_out = js_out.pop('weights')
+    for key in js_1.keys():
+        js_out[key] = js_1[key]
+    with open(f"tests/data/processed/{IOC_CODE}.json", "w") as fp:
+        json.dump(js_out, fp)
     # fmt: on
 
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<

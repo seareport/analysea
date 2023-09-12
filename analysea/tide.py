@@ -10,7 +10,7 @@ import numpy.typing as npt
 import pandas as pd
 import utide
 
-from analysea.utils import calculate_completeness
+from analysea.utils import completeness
 
 # tidal analysis options
 OPTS = {
@@ -71,31 +71,31 @@ ASTRO_WRITE = [
 
 
 def get_const_amps_labels(
-    keep: List[str], tide: Dict[Any, Any]
+    keep: List[str], coef: Dict[Any, Any]
 ) -> Tuple[npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any]]:
     """
     recognise & plot only the main constituents
     """
     ix = []
     for c in keep:
-        if c in tide["name"].tolist():
-            i = tide["name"].tolist().index(c)
+        if c in coef["name"].tolist():
+            i = coef["name"].tolist().index(c)
             ix.append(i)
-    amps = np.append(tide["A"][np.sort(ix)], np.zeros(len(keep) - len(ix)))
-    const = np.append(tide["name"][np.sort(ix)], np.empty(len(keep) - len(ix)))
-    phases = np.append(tide["g"][np.sort(ix)], np.empty(len(keep) - len(ix)))
+    amps = np.append(coef["A"][np.sort(ix)], np.zeros(len(keep) - len(ix)))
+    const = np.append(coef["name"][np.sort(ix)], np.empty(len(keep) - len(ix)))
+    phases = np.append(coef["g"][np.sort(ix)], np.empty(len(keep) - len(ix)))
     return amps, const, phases
 
 
 def demean_amps_phases(
-    tides: List[Dict[Any, Any]], keep_const: List[str]
-) -> Tuple[npt.NDArray[Any], npt.NDArray[Any]]:
-    amps = np.zeros((len(keep_const), len(tides)))
-    phases = np.zeros((len(keep_const), len(tides)))
-    vect = np.ones(len(tides)) / len(tides)
+    coefs: List[Dict[Any, Any]], keep_const: List[str]
+) -> Tuple[npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any]]:
+    amps = np.zeros((len(keep_const), len(coefs)))
+    phases = np.zeros((len(keep_const), len(coefs)))
+    vect = np.ones(len(coefs)) / len(coefs)
     #
-    for iyear, tide in enumerate(tides):
-        _amps, const, _phases = get_const_amps_labels(keep_const, tide)
+    for iyear, coef in enumerate(coefs):
+        _amps, const, _phases = get_const_amps_labels(keep_const, coef)
         amps[:, iyear] = _amps
         phases[:, iyear] = _phases
     #
@@ -104,15 +104,15 @@ def demean_amps_phases(
 
     # do one more iteration, and drop value outside of standard deviation
     std_amps = np.std(amps, axis=1)
-    amps = np.zeros((len(keep_const), len(tides)))
-    phases = np.zeros((len(keep_const), len(tides)))
+    amps = np.zeros((len(keep_const), len(coefs)))
+    phases = np.zeros((len(keep_const), len(coefs)))
     #
     iM2 = const.tolist().index("M2")
     stdM2 = std_amps[iM2]
     MM2 = mean_amps[iM2]
 
-    for iyear, tide in enumerate(tides):
-        _amps, const, _phases = get_const_amps_labels(keep_const, tide)
+    for iyear, coef in enumerate(coefs):
+        _amps, const, _phases = get_const_amps_labels(keep_const, coef)
         if abs(_amps[iM2] - MM2) < stdM2:
             amps[:, iyear] = _amps
             phases[:, iyear] = _phases
@@ -122,7 +122,7 @@ def demean_amps_phases(
     mean_amps = np.dot(amps, vect) / vect.sum()
     mean_phases = np.dot(phases, vect)
     #
-    return mean_amps, mean_phases
+    return const, mean_amps, mean_phases  # ignore mypy
 
 
 def tide_analysis(
@@ -158,7 +158,7 @@ def yearly_tide_analysis(
     for i in range(n_years):
         if i == n_years - 1:
             signal = h.loc[lambda x: (x.index > t_tmp) & (x.index < max_time)]
-            if calculate_completeness(signal) > 70:
+            if completeness(signal) > 70:
                 years.append(t_tmp.year)
                 tide_tmp, surge_tmp, coef = tide_analysis(signal, kwargs)
                 coefs.append(coef)
@@ -169,7 +169,7 @@ def yearly_tide_analysis(
             signal = h.loc[
                 lambda x: (x.index > t_tmp) & (x.index < t_tmp + pd.Timedelta(days=split_period))
             ]
-            if calculate_completeness(signal) > 70:
+            if completeness(signal) > 70:
                 years.append(t_tmp.year)
                 tide_tmp, surge_tmp, coef = tide_analysis(signal, kwargs)
                 coefs.append(coef)

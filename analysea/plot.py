@@ -20,7 +20,7 @@ from matplotlib.gridspec import GridSpec
 
 from analysea.tide import demean_amps_phases
 from analysea.tide import get_const_amps_labels
-from analysea.utils import calculate_completeness
+from analysea.utils import completeness
 
 # ===================
 # global variables
@@ -91,7 +91,7 @@ def plot_gaps(
         (
             f"{len(gaps)} bigs gaps with average gap duration: {gaps.mean()}",
             f"with the biggest gap being : {gaps.max()}",
-            f"completeness: {np.round(calculate_completeness(df),2)}%",
+            f"completeness: {np.round(completeness(df),2)}%",
         )
     )
     props = dict(boxstyle="round", facecolor="white", alpha=0.7)
@@ -148,7 +148,7 @@ def plot_multiyear_tide_analysis(
         ax1.bar(x + offset, amps, width, label=year)
         multiplier += 1
 
-    mean_amps, mean_phases = demean_amps_phases(tides, keep_const)
+    _, mean_amps, mean_phases = demean_amps_phases(tides, keep_const)
 
     ax1.hlines(
         mean_amps,

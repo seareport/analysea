@@ -7,7 +7,10 @@ from typing import Tuple
 from typing import Union
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
+from scipy.signal import correlate
+from scipy.signal import correlation_lags
 
 # ===================
 # TIME SERIES
@@ -81,3 +84,36 @@ def json_format(d: Dict[Any, Any]) -> Dict[Any, Any]:
         elif isinstance(value, pd.Timedelta):
             d[key] = str(value)  # Convert pandas Timedelta to string
     return d
+
+
+def nd_format(d: Dict[Any, Any]) -> Dict[Any, Any]:
+    for key, value in d.items():
+        if isinstance(value, dict):
+            nd_format(value)  # Recurse into nested dictionaries
+        elif isinstance(value, list):
+            d[key] = np.array(value)  # Convert NumPy array to list
+    return d
+
+
+# Function to calculate correlation https://gist.github.com/FerusAndBeyond
+def correlation(x: npt.NDArray[Any], y: npt.NDArray[Any]) -> Any:
+    shortest = min(x.shape[0], y.shape[0])
+    return np.corrcoef(x[:shortest], y[:shortest])[0, 1]
+
+
+def shift_for_maximum_correlation(
+    x: npt.NDArray[Any], y: npt.NDArray[Any], time: npt.NDArray[Any]
+) -> Tuple[npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any]]:
+    correlation = correlate(x, y)
+    lags = correlation_lags(x.size, y.size)
+    lag = lags[np.argmax(correlation)]
+    print(f"Best lag: {lag}")
+    if lag < 0:
+        y = y[abs(lag) :]
+        x = x[: -abs(lag)]
+        time = time[: -abs(lag)]
+    else:
+        time = time[lag:]
+        x = x[lag:]
+        y = y[:-lag]
+    return x, y, time

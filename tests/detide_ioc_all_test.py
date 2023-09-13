@@ -28,7 +28,11 @@ IOC_STATIONS = ioc.get_ioc_stations()
 IOC_STATIONS["lon"] = IOC_STATIONS["geometry"].x
 IOC_STATIONS["lat"] = IOC_STATIONS["geometry"].y
 IOC_STATIONS = IOC_STATIONS.drop("geometry", axis=1)
-DATA_FOLDER = os.getcwd()  # put all the stations data in the same folder as this script
+#
+DATA_FOLDER = "/home/tomsail/Documents/scripts/Python/analysea/data"  # put all the stations data in the same folder as this script
+OUT = "tests/data"
+OUT_JSON = "tests/data/processed"
+OUT_FIG = "tests/data/graphs"
 
 # tidal analysis options
 OPTS = {
@@ -92,13 +96,13 @@ IOC_OUT = pd.DataFrame(IOC_STATIONS)
 
 # main call
 def main():
-    for _ioc_file in sorted(os.listdir(os.path.join(os.getcwd(), "data"))):
+    for _ioc_file in sorted(os.listdir(DATA_FOLDER)):
         if _ioc_file.endswith(".gzip"):
             print("   > _ioc_file = ", _ioc_file)
             # here is the IOC case
             _ioc_code = os.path.splitext(_ioc_file)[0]
             _ioc_index = np.where(IOC_OUT.ioc_code == _ioc_code)[0][0]
-            df0 = pd.read_parquet(os.path.join(DATA_FOLDER, "data", _ioc_code + ".gzip"))
+            df0 = pd.read_parquet(os.path.join(DATA_FOLDER, _ioc_code + ".gzip"))
             # fill already some info
             lat = IOC_OUT.iloc[_ioc_index].lat
             lon = IOC_OUT.iloc[_ioc_index].lon
@@ -179,6 +183,7 @@ def main():
                     js_1["steps"] = len(stepsx)
                     js_1["snr"] = (signaltonoise(df.slevel),)
                     js_1["unit_flag"] = units_flag
+                    js_1 = json_format(js_1)
                     #
                     df1 = df.reset_index().drop_duplicates(subset="time", keep="last").set_index("time")
                     df1["tide"], df1["surge"], coefs, years = yearly_tide_analysis(df1.anomaly, 365, OPTS)
@@ -196,18 +201,6 @@ def main():
                     IOC_OUT.loc[_ioc_index, ["analysed"]] = js_1["analysed"] = True
                     # save the coefs calculated and average them
                     const, mean_amps, mean_phases = demean_amps_phases(coefs, coefs[0]["name"])
-                    js_out = json_format(coefs[-1])
-                    js_1 = json_format(js_1)
-                    js_out["weights"] = 0  # weights list is too long and unused in the reconstruction
-                    js_out["A"] = mean_amps.tolist()
-                    js_out["g"] = mean_phases.tolist()
-                    for key in js_1.keys():
-                        js_out[key] = js_1[key]
-                    with open(f"tests/data/processed/{_ioc_code}.json", "w") as fp:
-                        json.dump(js_out, fp)
-
-                    out = pd.DataFrame(data=df1.surge, index=df1.index)
-                    out.to_parquet(f"./data/processed/{_ioc_code}_surge.gzip", compression="gzip")
                     # plots
                     plot_multiyear_tide_analysis(
                         ASTRO_PLOT, coefs, years, lat, lon, df1, title, filenameOut
@@ -215,7 +208,18 @@ def main():
                     plot_multiyear_tide_analysis(
                         ASTRO_PLOT, coefs, years, lat, lon, df1, title, filenameOut, zoom=True
                     )
-
+                    js_out = json_format(coefs[-1])
+                    js_out["weights"] = 0  # weights list is too long and unused in the reconstruction
+                    js_out["A"] = mean_amps.tolist()
+                    js_out["g"] = mean_phases.tolist()
+                    for key in js_1.keys():
+                        js_out[key] = js_1[key]
+                    # export JSON file
+                    with open(os.path.join(OUT_JSON, f"{_ioc_code}.json"), "w") as fp:
+                        json.dump(js_out, fp)
+                    # export surge
+                    out = pd.DataFrame(data=df1.surge, index=df1.index)
+                    out.to_parquet(os.path.join(OUT, f"{_ioc_code}_surge.gzip"), compression="gzip")
             except Exception as e:
                 print("Error: ", e)
                 IOC_OUT.loc[_ioc_index, ["first_obs"]] = min_time.strftime("%Y-%m-%dT%H:%M:%S")
@@ -223,7 +227,7 @@ def main():
                 IOC_OUT.loc[_ioc_index, ["analysed"]] = False
             IOC_OUT.to_parquet("IOC_api_analysed.gzip")
             with open(f"./data/processed/{_ioc_code}.json", "w") as fp:
-                json.dump(json_format(js_1), f, indent=2)
+                json.dump(json_format(js_1), fp, indent=2)
 
     # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     # ~~~~ Jenkins' success message ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

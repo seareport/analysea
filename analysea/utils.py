@@ -5,6 +5,7 @@ from typing import cast
 from typing import Dict
 from typing import Tuple
 from typing import Union
+import itertools
 
 import numpy as np
 import numpy.typing as npt
@@ -15,6 +16,52 @@ from scipy.signal import correlation_lags
 # ===================
 # TIME SERIES
 # ===================
+def detect_splits(sr: pd.Series, max_gap: pd.Timedelta) -> pd.DatetimeIndex:
+    split_points = pd.DatetimeIndex([sr.index[0], sr.index[-1]])
+    condition = (sr.index.to_series().diff() > max_gap)
+    for i, point in enumerate(sr[condition].index, 1):
+        split_points = split_points.insert(i, point)
+    return split_points
+
+def split_series(sr: pd.Series, max_gap: pd.Timedelta = pd.Timedelta(hours=24)) -> pd.Series:
+    for (start, stop) in itertools.pairwise(detect_splits(sr=sr, max_gap=max_gap)):
+        segment = sr[start:stop]
+        yield segment[:-1]
+        
+def calc_stats(segments: list[pd.Series]) -> pd.DataFrame:
+    data = [] 
+    for i, segment in enumerate(segments):
+        ss = dict(
+            start=segment.index[0],
+            end=segment.index[-1],
+            duration=segment.index[-1] - segment.index[0],
+            scount=segment.count(),
+            smean=segment.mean(),
+            sstd=segment.std(),
+            smin=segment.min(),
+            s01=segment.quantile(0.01),
+            s10=segment.quantile(0.10),
+            s25=segment.quantile(0.25),
+            s50=segment.quantile(0.50),
+            s75=segment.quantile(0.75),
+            s90=segment.quantile(0.90),
+            s99=segment.quantile(0.99),
+            smax=segment.max(),
+            sskewness=segment.skew(),
+            skurtosis=segment.kurtosis(),
+        )
+        data.append(ss)
+    stats = pd.DataFrame(data)
+    return stats
+
+def cleanup(
+    ts: pd.Series, 
+    despike: bool = True,
+    demean: bool = True,
+    clip_limits: tuple[float, float] | None = None,
+    # ...
+) -> pd.Series:
+    pass
 
 
 def average(df: pd.DataFrame) -> pd.DataFrame:

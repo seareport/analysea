@@ -11,6 +11,7 @@ import pandas as pd
 import utide
 
 from analysea.utils import completeness
+from analysea.utils import nd_format
 
 # tidal analysis options
 OPTS = {
@@ -86,6 +87,13 @@ def get_const_amps_labels(
     phases = np.append(coef["g"][np.sort(ix)], np.empty(len(keep) - len(ix)))
     return amps, const, phases
 
+def circular_mean(angles: npt.NDArray[Any]) -> npt.NDArray[Any]:
+    angles_rad = np.deg2rad(angles)
+    mean_x = np.mean(np.sin(angles_rad))
+    mean_y = np.mean(np.cos(angles_rad))
+    mean_angle_rad = np.arctan2(mean_x, mean_y)
+    return np.rad2deg(mean_angle_rad)
+
 
 def demean_amps_phases(
     coefs: List[Dict[Any, Any]], keep_const: List[str]
@@ -99,86 +107,97 @@ def demean_amps_phases(
         amps[:, iyear] = _amps
         phases[:, iyear] = _phases
     #
-    mean_amps = np.dot(amps, vect)
-    mean_phases = np.dot(phases, vect)
-
-    # do one more iteration, and drop value outside of standard deviation
-    std_amps = np.std(amps, axis=1)
-    amps = np.zeros((len(keep_const), len(coefs)))
-    phases = np.zeros((len(keep_const), len(coefs)))
-    #
-    iM2 = const.tolist().index("M2")
-    stdM2 = std_amps[iM2]
-    MM2 = mean_amps[iM2]
-
-    for iyear, coef in enumerate(coefs):
-        _amps, const, _phases = get_const_amps_labels(keep_const, coef)
-        if abs(_amps[iM2] - MM2) < stdM2:
-            amps[:, iyear] = _amps
-            phases[:, iyear] = _phases
-        else:
-            vect[iyear] = 0
-    #
-    mean_amps = np.dot(amps, vect) / vect.sum()
-    mean_phases = np.dot(phases, vect)
+    mean_amps = np.apply_along_axis(np.mean, 1, amps)
+    mean_phases = np.apply_along_axis(circular_mean, 1, phases)
     #
     return const, mean_amps, mean_phases  # ignore mypy
 
 
-def tide_analysis(
-    h: pd.Series[float], kwargs: Dict[str, Any]
-) -> Tuple[pd.DataFrame, pd.DataFrame, npt.NDArray[Any]]:
-    h = h - h.mean()  # ensuring mean
+def calc_constituents(
+    ts: pd.Series,
+    kwargs: Dict[str, Any]
+) -> npt.NDArray[Any]:
     # resample to 10 min for a MUCH faster analysis
     # https://github.com/wesleybowman/UTide/issues/103
-    h_rsmp = h.resample("10min").mean()
+    h_rsmp = ts.resample("10min").mean()
     ts = h_rsmp.index
     coef = utide.solve(ts, h_rsmp, **kwargs)
-    tidal = utide.reconstruct(h.index, coef, verbose=kwargs["verbose"])
-    return pd.DataFrame(data=tidal.h, index=h.index), h - tidal.h, coef
+    return coef
 
 
-def yearly_tide_analysis(
-    h: pd.Series[float], split_period: int, kwargs: Dict[str, Any] = OPTS
-) -> Tuple[pd.DataFrame, pd.DataFrame, List[npt.NDArray[Any]], List[int]]:
-    if kwargs["verbose"]:
-        log = True
-    else:
-        log = False
-    #
-    ts = h.index
-    min_time = pd.Timestamp(ts.min())
-    max_time = pd.Timestamp(ts.max())
-    t_tmp = pd.Timestamp(min_time)
-    n_years = int(np.floor((max_time - min_time).days / split_period))
-    years = []
+def detide(
+    ts: pd.Series[float], 
+    kwargs: Dict[str, Any],
+    constituents: dict[str, float] | None = None,
+) -> pd.Series:
+    if constituents is None:
+        constituents = calc_constituents(ts=ts)
+        tidal = utide.reconstruct(ts.index, nd_format(constituents), verbose=kwargs["verbose"])
+    else : 
+        tidal = utide.reconstruct(ts.index, nd_format(constituents), verbose=kwargs["verbose"])
+    storm_surge = ts - tidal.h
+    return storm_surge
+
+
+def detide_yearly(h: pd.Series[float], 
+                         split_period: int, 
+                         kwargs: Dict[str, Any] = OPTS) -> pd.Series:
+    
+    log = kwargs.get("verbose", False)
+    
+    min_time = pd.Timestamp(h.index.min())
+    max_time = pd.Timestamp(h.index.max())
+    date_ranges = pd.date_range(start=min_time, end=max_time, freq=f'{split_period}D')
+    surge = pd.DataFrame([])
+
+    for start, end in zip(date_ranges[:-1], date_ranges[1:]):
+        signal = h[start:end]
+        if completeness(signal) > 70:
+            surge_tmp = detide(signal, kwargs)
+            surge = pd.concat([surge, surge_tmp])
+        if log:
+            print(f"  => Analyse year {start.year} ({start}-{end})")
+            print(f"   +>  {len(surge)} / {len(h)} records done")
+
+    return surge
+
+
+def tide_analysis(
+    ts: pd.Series[float], 
+    kwargs: Dict[str, Any],
+) -> Tuple[pd.DataFrame, pd.DataFrame, npt.NDArray[Any]]:
+    constituents = calc_constituents(ts=ts, kwargs=kwargs)
+    tidal = utide.reconstruct(ts.index, constituents, verbose=kwargs["verbose"])
+    return pd.DataFrame(data=tidal.h, index=ts.index), ts - tidal.h, constituents
+
+
+def yearly_tide_analysis(h: pd.Series[float], 
+                         split_period: int, 
+                         kwargs: Dict[str, Any] = OPTS) -> Tuple[pd.DataFrame, pd.DataFrame, List[npt.NDArray[Any]], List[int]]:
+    
+    log = kwargs.get("verbose", False)
+    
+    min_time = pd.Timestamp(h.index.min())
+    max_time = pd.Timestamp(h.index.max())
+    date_ranges = pd.date_range(start=min_time, end=max_time, freq=f'{split_period}D')
+    
     tide = pd.DataFrame([])
     surge = pd.DataFrame([])
     coefs = []
-    for i in range(n_years):
-        if i == n_years - 1:
-            signal = h.loc[lambda x: (x.index > t_tmp) & (x.index < max_time)]
-            if completeness(signal) > 70:
-                years.append(t_tmp.year)
-                tide_tmp, surge_tmp, coef = tide_analysis(signal, kwargs)
-                coefs.append(coef)
-                tide = pd.concat([tide, tide_tmp])
-                surge = pd.concat([surge, surge_tmp])
-            t_tmp += pd.Timedelta(days=split_period)
-        else:
-            signal = h.loc[
-                lambda x: (x.index > t_tmp) & (x.index < t_tmp + pd.Timedelta(days=split_period))
-            ]
-            if completeness(signal) > 70:
-                years.append(t_tmp.year)
-                tide_tmp, surge_tmp, coef = tide_analysis(signal, kwargs)
-                coefs.append(coef)
-                tide = pd.concat([tide, tide_tmp])
-                surge = pd.concat([surge, surge_tmp])
-            t_tmp += pd.Timedelta(days=split_period)
+    years = []
+
+    for start, end in zip(date_ranges[:-1], date_ranges[1:]):
+        signal = h[start:end]
+
+        if completeness(signal) > 70:
+            years.append(start.year)
+            tide_tmp, surge_tmp, coef = tide_analysis(signal, kwargs)
+            coefs.append(coef)
+            tide = pd.concat([tide, tide_tmp])
+            surge = pd.concat([surge, surge_tmp])
+            
         if log:
-            print("  => Analyse year", i, "of", n_years)
-            print("   +> ", len(tide), "/", len(h), "records done")
-    # tide = tide.reset_index().drop_duplicates(subset="index", keep="last").set_index("index")
-    # surge = surge.reset_index().drop_duplicates(subset="index", keep="last").set_index("index")
+            print(f"  => Analyse year {start.year} ({start}-{end})")
+            print(f"   +>  {len(tide)} / {len(h)} records done")
+
     return tide, surge, coefs, years

@@ -31,6 +31,13 @@ def despike_prominence(df: pd.DataFrame, prominence: float) -> Tuple[Any, Any, p
     return ipeaks, peaks, res
 
 
+# https://stackoverflow.com/questions/23199796/detect-and-exclude-outliers-in-a-pandas-dataframe
+def remove_outliers(sr: pd.Series, lower: float = 0.25, upper: float = 0.75) -> pd.Series:
+    iqr = sr.quantile(upper) - sr.quantile(lower)
+    lim = np.abs((sr - sr.median()) / iqr) < 2.22
+    return sr[lim]
+
+
 def EWMA(df: pd.DataFrame, span: int) -> pd.DataFrame:
     # Forwards EWMA.
     fwd = df.ewm(span=span).mean()

@@ -145,7 +145,7 @@ def plot_multiyear_tide_analysis(
         mean_amps += amps
         mean_phases += phases
         offset = width * multiplier - width * len(keep_const) / 4
-        ax1.bar(x + offset, amps, width, label=year)
+        ax1.bar(x + offset, amps, width, label=str(year))
         multiplier += 1
 
     _, mean_amps, mean_phases = demean_amps_phases(tides, keep_const)

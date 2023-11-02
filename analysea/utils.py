@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import itertools
 from typing import Any
 from typing import cast
 from typing import Dict
+from typing import Optional
 from typing import Tuple
 from typing import Union
-import itertools
 
 import numpy as np
 import numpy.typing as npt
@@ -13,23 +14,28 @@ import pandas as pd
 from scipy.signal import correlate
 from scipy.signal import correlation_lags
 
+from analysea.spikes import remove_outliers
+
+
 # ===================
 # TIME SERIES
 # ===================
 def detect_splits(sr: pd.Series, max_gap: pd.Timedelta) -> pd.DatetimeIndex:
     split_points = pd.DatetimeIndex([sr.index[0], sr.index[-1]])
-    condition = (sr.index.to_series().diff() > max_gap)
+    condition = sr.index.to_series().diff() > max_gap
     for i, point in enumerate(sr[condition].index, 1):
         split_points = split_points.insert(i, point)
     return split_points
 
+
 def split_series(sr: pd.Series, max_gap: pd.Timedelta = pd.Timedelta(hours=24)) -> pd.Series:
-    for (start, stop) in itertools.pairwise(detect_splits(sr=sr, max_gap=max_gap)):
+    for start, stop in itertools.pairwise(detect_splits(sr=sr, max_gap=max_gap)):
         segment = sr[start:stop]
         yield segment[:-1]
-        
+
+
 def calc_stats(segments: list[pd.Series]) -> pd.DataFrame:
-    data = [] 
+    data = []
     for i, segment in enumerate(segments):
         ss = dict(
             start=segment.index[0],
@@ -54,14 +60,39 @@ def calc_stats(segments: list[pd.Series]) -> pd.DataFrame:
     stats = pd.DataFrame(data)
     return stats
 
+
 def cleanup(
-    ts: pd.Series, 
+    ts: pd.Series,
     despike: bool = True,
     demean: bool = True,
-    clip_limits: tuple[float, float] | None = None,
-    # ...
-) -> pd.Series:
-    pass
+    clip_limits: Optional[tuple[float, float]] = None,
+    kurtosis: float = 2.0,
+) -> pd.DataFrame:
+    # Check if the input is empty
+    if ts.empty:
+        return pd.DataFrame()
+    s1 = ts[ts.diff() != 0]  # remove flat areas
+    ss = s1[abs(s1.diff()) < s1.std()]  # remove steps
+    if demean:
+        ss = ss - ss.mean()
+    if ss.empty:
+        return pd.DataFrame()
+
+    df = pd.DataFrame()
+    for sensor in ss.columns:
+        sr = ss[sensor]
+        segments = [seg for seg in split_series(sr, max_gap=pd.Timedelta(hours=6)) if not seg.empty]
+        for seg in segments:
+            # remove outliers
+            if despike and clip_limits:
+                seg = remove_outliers(seg, *clip_limits)
+            if seg.empty:
+                continue
+            stats = calc_stats([seg])
+            if abs(stats.iloc[0].skurtosis) < kurtosis:
+                df = pd.concat([df, pd.DataFrame({sensor: seg}, index=seg.index)])
+
+    return df
 
 
 def average(df: pd.DataFrame) -> pd.DataFrame:

@@ -1,3 +1,4 @@
+# mypy: disable-error-code="attr-defined"
 from __future__ import annotations
 
 import os
@@ -8,7 +9,6 @@ from typing import Tuple
 
 import cartopy.crs as ccrs
 import cartopy.feature as cf
-import matplotlib
 import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 from cartopy.mpl.gridliner import LATITUDE_FORMATTER
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER
+from matplotlib.figure import Figure
 from matplotlib.gridspec import GridSpec
 
 from analysea.tide import demean_amps_phases
@@ -75,9 +76,7 @@ ASTRO_WRITE = [
 # ===================
 # PLOT FUNCTIONS
 # ===================
-def plot_gaps(
-    df: pd.DataFrame, gaps: pd.Series[Any], fileout: str
-) -> Tuple[None, matplotlib.pyplot.figure]:
+def plot_gaps(df: pd.DataFrame, gaps: pd.Series[Any], fileout: str) -> Tuple[Figure, Any]:
     fig, ax = plt.subplots(figsize=(19, 10))
     df.interpolate().plot(ax=ax)
     for i, (ig, gap) in enumerate(gaps.items()):

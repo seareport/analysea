@@ -24,6 +24,14 @@ ipykernel = "^6.25.1"
 ipympl = "^0.9.3"
 scikit-image = "^0.21.0"
 lttb = "^0.3.1"
+pyposeidon = {git = "https://github.com/ec-jrc/pyPoseidon.git"}
+azure-identity = "^1.15.0"
+adlfs = "^2023.10.0"
+fsspec = "^2023.10.0"
+thalassa = {git = "https://github.com/ec-jrc/Thalassa.git"}
+jupyter-bokeh = "^3.0.7"
+observer = {git = "https://github.com/seareport/observer.git"}
+eccodes = "^1.6.1"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.25.1"

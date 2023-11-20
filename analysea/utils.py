@@ -66,13 +66,15 @@ def cleanup(
     despike: bool = True,
     demean: bool = True,
     clip_limits: Optional[tuple[float, float]] = None,
-    kurtosis: float = 2.0,
+    kurtosis: Optional[float] = 2.0,
+    remove_flats: Optional[bool] = False,
 ) -> pd.DataFrame:
     # Check if the input is empty
     if ts.empty:
         return pd.DataFrame()
-    s1 = ts[ts.diff() != 0]  # remove flat areas
-    ss = s1[abs(s1.diff()) < s1.std()]  # remove steps
+    if remove_flats:
+        ts = ts[ts.diff() != 0]  # remove flat areas
+    ss = ts[abs(ts.diff()) < ts.std()]  # remove steps
     if demean:
         ss = ss - ss.mean()
     if ss.empty:

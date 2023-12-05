@@ -7,32 +7,25 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.12"
-adlfs = "*"
-azure-identity = "*"
 cartopy = "*"
-eccodes = "*"
-fastparquet = "*"
-fsspec = "*"
+dask = {version = "*", extras = ["complete"]}
 geopandas = "*"
-jupyter-bokeh = "*"
-lttb = "*"
 matplotlib = "*"
 observer = {git = "https://github.com/seareport/observer.git"}
-owslib = "*"
 pandas = "*"
-pyarrow = "*"
 pyposeidon = {git = "https://github.com/ec-jrc/pyPoseidon.git"}
 ruptures = "*"
 scikit-image = "*"
 searvey = "*"
 shapely = "*"
-thalassa = {git = "https://github.com/ec-jrc/Thalassa.git"}
+thalassa = "*"
 utide = "*"
-xarray = "*"
+xarray = {version = "*", extras = ["io", "accel"]}
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "*"
 ipympl = "*"
+jupyter-bokeh = "*"
 mypy = "*"
 pytest = "*"
 

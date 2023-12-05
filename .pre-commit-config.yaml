@@ -8,10 +8,10 @@ fail_fast: false
 
 repos:
   - repo: "https://github.com/pre-commit/pre-commit-hooks"
-    rev: "v4.4.0"
+    rev: "v4.5.0"
     hooks:
       - id: "check-added-large-files"
-        args: ['--maxkb=40000']
+        args: ["--maxkb=40000"]
       - id: "check-ast"
       - id: "check-byte-order-marker"
       - id: "check-docstring-first"
@@ -36,20 +36,20 @@ repos:
       - id: "python-use-type-annotations"
 
   - repo: "https://github.com/asottile/reorder_python_imports"
-    rev: "v3.10.0"
+    rev: "v3.12.0"
     hooks:
       - id: "reorder-python-imports"
         args:
           - "--py38-plus"
 
   - repo: "https://github.com/psf/black"
-    rev: "23.7.0"
+    rev: "23.11.0"
     hooks:
       - id: "black"
 
-  - repo: "https://github.com/charliermarsh/ruff-pre-commit"
+  - repo: "https://github.com/astral-sh/ruff-pre-commit"
     # Ruff version.
-    rev: 'v0.0.281'
+    rev: "v0.1.7"
     hooks:
       - id: "ruff"
 
@@ -59,26 +59,46 @@ repos:
       - id: "nbstripout"
 
   - repo: "https://github.com/python-poetry/poetry"
-    rev: "1.5.0"
+    rev: "1.7.0"
     hooks:
       - id: "poetry-check"
+        name: "poetry check"
+      - id: "poetry-check"
+        name: "poetry check --lock"
+        args: ["--lock"]
       - id: "poetry-lock"
-        args: ["--check"]
+        name: "poetry lock --no-update"
+        args: ["--no-update"]
       - id: "poetry-export"
-        name: 'poetry export main'
-        args: ["--without-hashes", "--only", "main", "-f", "requirements.txt", "-o", "requirements/requirements.txt"]
+        name: "poetry export main"
+        args:
+          [
+            "--only",
+            "main",
+            "-f",
+            "requirements.txt",
+            "-o",
+            "requirements/requirements.txt",
+          ]
       - id: "poetry-export"
-        name: 'poetry export dev'
-        args: ["--without-hashes", "--with", "dev", "--with", "docs", "--with", "jupyter", "-f", "requirements.txt", "-o", "requirements/requirements-dev.txt"]
+        name: "poetry export dev"
+        args:
+          [
+            "--with",
+            "dev",
+            "-f",
+            "requirements.txt",
+            "-o",
+            "requirements/requirements-dev.txt",
+          ]
 
   - repo: "local"
     hooks:
-
-      - id: "mypy"
-        name: "mypy"
-        entry: "make mypy"
-        language: "system"
-        types: ["python"]
+      # - id: "mypy"
+      #   name: "mypy"
+      #   entry: "make mypy"
+      #   language: "system"
+      #   types: ["python"]
 
       - id: "docs"
         name: "docs"

@@ -74,7 +74,8 @@ def remove_steps_simple(df: pd.DataFrame, threshold: float) -> Tuple[pd.DataFram
 def step_function_TV(df: pd.DataFrame, weight: float = 1) -> Tuple[pd.DataFrame, npt.NDArray[Any]]:
     idx = range(0, len(df), 200)
     signal = np.array(df.interpolate())[idx]
-    signal_denoise = denoise_tv_chambolle(signal, weight=weight)  # adjust the parameters
+    # adjust the parameters
+    signal_denoise = denoise_tv_chambolle(signal, weight=weight)  # type: ignore[no-untyped-call]
     # x_step = -2*np.cumsum(signal_denoise)
     # step_indicator = x_step == x_step.max()
     f = interpolate.interp1d(

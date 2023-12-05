@@ -602,10 +602,7 @@ files = [
 ]
 
 [package.dependencies]
-numpy = [
-    {version = ">1.13.3", markers = "python_version < \"3.12.0.rc1\""},
-    {version = ">=1.26.0b1", markers = "python_version >= \"3.12.0.rc1\""},
-]
+numpy = {version = ">1.13.3", markers = "python_version < \"3.12.0.rc1\""}
 
 [[package]]
 name = "charset-normalizer"
@@ -900,7 +897,7 @@ files = [
 ]
 
 [package.dependencies]
-numpy = {version = ">=1.16,<2.0", markers = "python_version <= \"3.11\""}
+numpy = ">=1.20,<2.0"
 
 [package.extras]
 bokeh = ["bokeh", "selenium"]
@@ -1594,13 +1591,13 @@ files = [
 
 [[package]]
 name = "fsspec"
-version = "2023.12.0"
+version = "2023.12.1"
 description = "File-system specification"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "fsspec-2023.12.0-py3-none-any.whl", hash = "sha256:f807252ee2018f2223760315beb87a2166c2b9532786eeca9e6548dfcf2cfac9"},
-    {file = "fsspec-2023.12.0.tar.gz", hash = "sha256:8e0bb2db2a94082968483b7ba2eaebf3949835e2dfdf09243dda387539464b31"},
+    {file = "fsspec-2023.12.1-py3-none-any.whl", hash = "sha256:6271f1d3075a378bfe432f6f42bf7e1d2a6ba74f78dd9b512385474c579146a0"},
+    {file = "fsspec-2023.12.1.tar.gz", hash = "sha256:c4da01a35ac65c853f833e43f67802c25213f560820d54ddf248f92eddd5e990"},
 ]
 
 [package.extras]
@@ -2433,21 +2430,6 @@ files = [
 ]
 
 [[package]]
-name = "lttb"
-version = "0.3.1"
-description = "Largest-Triangle-Three-Buckets algorithm for downsampling time series-like data"
-optional = false
-python-versions = "*"
-files = [
-    {file = "lttb-0.3.1-py2-none-any.whl", hash = "sha256:1bc6ad38626c4bf3b12858e59369c5f03e9b7833999cd955bf7251a6570e9252"},
-    {file = "lttb-0.3.1-py3-none-any.whl", hash = "sha256:aae09aa6865adf0626fb80c1eea87a9ecc352a950c5759bb167945c0fb38eabf"},
-    {file = "lttb-0.3.1.tar.gz", hash = "sha256:7a8e7d75c6147b3875a66132b73dfac16cde7bc7242a5ff83e5186a8a7c6812c"},
-]
-
-[package.dependencies]
-numpy = "*"
-
-[[package]]
 name = "lxml"
 version = "4.9.3"
 description = "Powerful and Pythonic XML processing library combining libxml2/libxslt with the ElementTree API."
@@ -2805,13 +2787,13 @@ files = [
 
 [[package]]
 name = "msal"
-version = "1.25.0"
-description = "The Microsoft Authentication Library (MSAL) for Python library"
+version = "1.26.0"
+description = "The Microsoft Authentication Library (MSAL) for Python library enables your app to access the Microsoft Cloud by supporting authentication of users with Microsoft Azure Active Directory accounts (AAD) and Microsoft Accounts (MSA) using industry standard OAuth2 and OpenID Connect."
 optional = false
 python-versions = ">=2.7"
 files = [
-    {file = "msal-1.25.0-py2.py3-none-any.whl", hash = "sha256:386df621becb506bc315a713ec3d4d5b5d6163116955c7dde23622f156b81af6"},
-    {file = "msal-1.25.0.tar.gz", hash = "sha256:f44329fdb59f4f044c779164a34474b8a44ad9e4940afbc4c3a3a2bbe90324d9"},
+    {file = "msal-1.26.0-py2.py3-none-any.whl", hash = "sha256:be77ba6a8f49c9ff598bbcdc5dfcf1c9842f3044300109af738e8c3e371065b5"},
+    {file = "msal-1.26.0.tar.gz", hash = "sha256:224756079fe338be838737682b49f8ebc20a87c1c5eeaf590daae4532b83de15"},
 ]
 
 [package.dependencies]
@@ -3365,24 +3347,6 @@ docs = ["numpydoc", "sphinx (==1.2.3)", "sphinx-rtd-theme", "sphinxcontrib-napol
 tests = ["pytest", "pytest-cov", "pytest-pep8"]
 
 [[package]]
-name = "owslib"
-version = "0.29.3"
-description = "OGC Web Service utility library"
-optional = false
-python-versions = ">=3.6"
-files = [
-    {file = "OWSLib-0.29.3-py2.py3-none-any.whl", hash = "sha256:69d0175463a9dcf49d68599d7b88309a42c79196d8a9e134b6607c056b42a50e"},
-    {file = "OWSLib-0.29.3.tar.gz", hash = "sha256:3baf34058458b933767ee43e632174cb0baebf49d326da179faacb9772f98539"},
-]
-
-[package.dependencies]
-lxml = "*"
-python-dateutil = ">=1.5"
-pytz = "*"
-pyyaml = "*"
-requests = ">=1.0"
-
-[[package]]
 name = "packaging"
 version = "23.2"
 description = "Core utilities for Python packages"
@@ -3663,6 +3627,21 @@ dev = ["pre-commit", "tox"]
 testing = ["pytest", "pytest-benchmark"]
 
 [[package]]
+name = "pooch"
+version = "1.8.0"
+description = "\"Pooch manages your Python library's sample data files: it automatically downloads and stores them in a local directory, with support for versioning and corruption checks.\""
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "pooch-1.8.0-py3-none-any.whl", hash = "sha256:1bfba436d9e2ad5199ccad3583cca8c241b8736b5bb23fe67c213d52650dbb66"},
+    {file = "pooch-1.8.0.tar.gz", hash = "sha256:f59981fd5b9b5d032dcde8f4a11eaa492c2ac6343fae3596a2fdae35fc54b0a0"},
+]
+
+[package.dependencies]
+packaging = ">=20.0"
+platformdirs = ">=2.5.0"
+requests = ">=2.19.0"
+
 [package.extras]
 progress = ["tqdm (>=4.41.0,<5.0.0)"]
 sftp = ["paramiko (>=2.7.0)"]
@@ -4986,12 +4965,14 @@ doc = ["reno", "sphinx", "tornado (>=4.5)"]
 
 [[package]]
 name = "thalassa"
-version = "0.0.0"
+version = "0.4.1"
 description = "A library for visualizing large scale results of hydrodynamic simulations"
 optional = false
-python-versions = ">=3.9, <4.0"
-files = []
-develop = false
+python-versions = ">=3.9,<4.0"
+files = [
+    {file = "thalassa-0.4.1-py3-none-any.whl", hash = "sha256:a384cd04ab311549f793dec2fefb4f5c60e0805cff849d3c4b95f5a7996c9222"},
+    {file = "thalassa-0.4.1.tar.gz", hash = "sha256:c2d64146e3ed86ed1b30f34b5e5e49b0dc60a53cb4bc44021c5114e2041046be"},
+]
 
 [package.dependencies]
 bokeh = ">=3.0"
@@ -5009,12 +4990,6 @@ pandas = "*"
 scipy = "*"
 shapely = "*"
 xarray = {version = "*", extras = ["accel", "io"]}
-
-[package.source]
-type = "git"
-url = "https://github.com/ec-jrc/Thalassa.git"
-reference = "HEAD"
-resolved_reference = "28104d3770f9004e732d15063f78b0f243a0f72e"
 
 [[package]]
 name = "tifffile"
@@ -5527,4 +5502,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "53f0a21507dacc794c50b3bb028c1861bc5577bd3c2a91001a8df024811e5a78"
+content-hash = "fe9aa61c85e345524a309eeb0d8883f6b2885f0e4d1db78c8a196d0ae106a4fe"

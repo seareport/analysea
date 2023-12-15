@@ -13,7 +13,6 @@ geopandas = "*"
 matplotlib = "*"
 observer = {git = "https://github.com/seareport/observer.git"}
 pandas = "*"
-pyposeidon = {git = "https://github.com/ec-jrc/pyPoseidon.git"}
 ruptures = "*"
 scikit-image = "*"
 searvey = "*"

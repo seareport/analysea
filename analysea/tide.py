@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 from typing import Dict
 from typing import List
+from typing import Optional
 from typing import Tuple
 
 import numpy as np
@@ -10,19 +11,7 @@ import numpy.typing as npt
 import pandas as pd
 import utide
 
-from analysea.utils import completeness
 from analysea.utils import nd_format
-
-# tidal analysis options
-OPTS = {
-    "conf_int": "linear",
-    "constit": "auto",
-    "method": "ols",  # ols is faster and good for missing data (Ponchaut et al., 2001)
-    "order_constit": "frequency",
-    "Rayleigh_min": 0.97,
-    "lat": None,
-    "verbose": False,
-}  # careful if there is only one Nan parameter, the analysis crashes
 
 ASTRO_PLOT = [
     "M2",
@@ -113,60 +102,84 @@ def demean_amps_phases(
     return const, mean_amps, mean_phases  # ignore mypy
 
 
-def calc_constituents(ts: pd.Series, kwargs: Dict[str, Any]) -> Any:
+def calc_constituents(
+    ts: pd.Series, resample_time: int = 10, lat: float = 0.0, **kwargs: Optional[Dict[str, Any]]
+) -> Any:
     # resample to 10 min for a MUCH faster analysis
     # https://github.com/wesleybowman/UTide/issues/103
-    h_rsmp = ts.resample("10min").mean()
+    h_rsmp = ts.resample(f"{resample_time}min").mean()
+
     ts = h_rsmp.index
-    coef = utide.solve(ts, h_rsmp, **kwargs)
+    # shifting half the sampling time
+    # > to recenter the averaged signal
+    df = h_rsmp.shift(freq=f"{resample_time // 2}min")
+    ts = df.index
+    df = h_rsmp.iloc[:, 0].values
+    coef = utide.solve(ts, df, lat=lat, **kwargs)
     return coef
+
+
+def reconstruct_chunk(
+    ts_chunk: pd.Series, constituents: Dict[Any, Any], **kwargs: Optional[Dict[Any, Any]]
+) -> pd.Series:
+    """
+    Reconstruct a single chunk of time series data.
+    This function is mainly aimed to reduce intense i/o loads (RAM usage)
+    """
+
+    tidal = utide.reconstruct(ts_chunk.index, nd_format(constituents), **kwargs)
+
+    return pd.Series(data=ts_chunk.iloc[:, 0].values - tidal.h, index=ts_chunk.index)
 
 
 def detide(
     ts: pd.Series[float],
-    kwargs: Dict[str, Any],
-    constituents: dict[str, float] | None = None,
+    constituents: Dict[Any, Any] | None = None,
+    lat: float = 0,
+    resample_time: int = 10,
+    split_period: int = 365,
+    **kwargs: Optional[Dict[Any, Any]],
 ) -> pd.Series:
-    if constituents is None:
-        constituents = calc_constituents(ts=ts, kwargs=kwargs)
-        tidal = utide.reconstruct(ts.index, nd_format(constituents), verbose=kwargs["verbose"])
-    else:
-        tidal = utide.reconstruct(ts.index, nd_format(constituents), verbose=kwargs["verbose"])
-    storm_surge = ts - tidal.h
-    return storm_surge
+    """
+    By default this function will split the time series into yearly chunks
 
+    @param ts: time series to be processed
+    @param constituents: constituents to be used in the analysis
+    @param lat: latitude of the station
+    @param resample_time: resample time in minutes
+    @param split_period: period in days to split the time series into (default 365)
+    @param kwargs: keyword arguments to be passed to utide.reconstruct
+    @return: reconstructed time series
+    """
+    result_series = []
+    date_ranges = pd.date_range(start=ts.index[0], end=ts.index[-1], freq=f"{split_period}D")
+    # Split the time series into 6-month chunks (default), otherwise specify
+    for start_date, end_date in zip(date_ranges[:-1], date_ranges[1:]):
+        ts_chunk = ts[start_date:end_date]
+        if constituents is None:
+            constituents = calc_constituents(ts=ts, resample_time=resample_time, lat=lat, **kwargs)
+        result_series.append(reconstruct_chunk(ts_chunk, constituents, **kwargs))
 
-def detide_yearly(h: pd.Series[float], split_period: int, kwargs: Dict[str, Any] = OPTS) -> pd.Series:
-    log = kwargs.get("verbose", False)
-
-    min_time = pd.Timestamp(h.index.min())
-    max_time = pd.Timestamp(h.index.max())
-    date_ranges = pd.date_range(start=min_time, end=max_time, freq=f"{split_period}D")
-    surge = pd.DataFrame([])
-
-    for start, end in zip(date_ranges[:-1], date_ranges[1:]):
-        signal = h[start:end]
-        surge_tmp = detide(signal, kwargs)
-        if not surge_tmp.empty:
-            surge = pd.concat([surge, surge_tmp])
-        if log:
-            print(f"  => Analyse year {start.year} ({start}-{end})")
-            print(f"   +>  {len(surge)} / {len(h)} records done")
-
-    return surge
+    # Concatenate the processed chunks
+    return pd.concat(result_series)
 
 
 def tide_analysis(
-    ts: pd.Series[float],
-    kwargs: Dict[str, Any],
+    ts: pd.Series[float], resample_time: int = 10, lat: float = 0.0, **kwargs: Optional[Dict[Any, Any]]
 ) -> Tuple[pd.DataFrame, pd.DataFrame, npt.NDArray[Any]]:
-    constituents = calc_constituents(ts=ts, kwargs=kwargs)
-    tidal = utide.reconstruct(ts.index, constituents, verbose=kwargs["verbose"])
-    return pd.DataFrame(data=tidal.h, index=ts.index), ts - tidal.h, constituents
+    constituents = calc_constituents(ts=ts, lat=lat, resample_time=resample_time, **kwargs)
+    tidal = utide.reconstruct(ts.index, constituents, **kwargs)
+    tide = pd.Series(data=tidal.h, index=ts.index)
+    surge = pd.Series(data=ts.iloc[0, :].values - tidal.h, index=ts.index)
+    return tide, surge, constituents
 
 
 def yearly_tide_analysis(
-    h: pd.Series[float], split_period: int, kwargs: Dict[str, Any] = OPTS
+    h: pd.Series[float],
+    resample_time: int = 10,
+    split_period: int = 365,
+    lat: int = 0,
+    **kwargs: Optional[Dict[Any, Any]],
 ) -> Tuple[pd.DataFrame, pd.DataFrame, List[npt.NDArray[Any]], List[int]]:
     log = kwargs.get("verbose", False)
 
@@ -174,25 +187,22 @@ def yearly_tide_analysis(
     max_time = pd.Timestamp(h.index.max())
     date_ranges = pd.date_range(start=min_time, end=max_time, freq=f"{split_period}D")
 
-    tide = pd.DataFrame([])
-    surge = pd.DataFrame([])
+    tide = []
+    surge = []
     coefs = []
     years = []
 
     for start, end in zip(date_ranges[:-1], date_ranges[1:]):
         signal = h[start:end]
 
-        if completeness(signal) > 70:
-            years.append(start.year)
-            tide_tmp, surge_tmp, coef = tide_analysis(signal, kwargs)
-            coefs.append(coef)
-            if not surge_tmp.empty:
-                surge = pd.concat([surge, surge_tmp])
-            if not tide_tmp.empty:
-                tide = pd.concat([tide, tide_tmp])
+        years.append(start.year)
+        tide_tmp, surge_tmp, coef = tide_analysis(signal, lat=lat, resample_time=resample_time, **kwargs)
+        coefs.append(coef)
+        surge.append(surge_tmp)
+        tide.append(tide_tmp)
 
         if log:
             print(f"  => Analyse year {start.year} ({start}-{end})")
             print(f"   +>  {len(tide)} / {len(h)} records done")
 
-    return tide, surge, coefs, years
+    return pd.concat(tide), pd.concat(surge), coefs, years

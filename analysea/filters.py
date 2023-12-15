@@ -19,7 +19,7 @@ def interp(df: pd.Series[Any], new_index: pd.Index[Any]) -> pd.DataFrame:
     return df_out
 
 
-def filter_fft(df: pd.DataFrame) -> pd.DataFrame:
+def filter_fft(df: pd.DataFrame, fcut: float = 20) -> pd.DataFrame:
     # df is a single channel dataframe with :
     # index as pandas.DatetimeIndex
     data = df.dropna().values
@@ -31,7 +31,7 @@ def filter_fft(df: pd.DataFrame) -> pd.DataFrame:
     fA = fs * 3600 * 24  # seconds in a day
     fftfreq = sp.fftpack.fftfreq(len(temp_psd), 1 / fA)
     temp_fft_bis = temp_fft.copy()
-    temp_fft_bis[np.abs(fftfreq) > 20] = 0
+    temp_fft_bis[np.abs(fftfreq) > fcut] = 0
     # suppressing everything passed the 10th harmonic
     # (first one being the semi-diurnal consituent of the tide)
     temp_slow = np.real(sp.fftpack.ifft(temp_fft_bis))

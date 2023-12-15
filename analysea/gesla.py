@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import warnings
-from typing import Optional
 from typing import Union
 
 import geopandas as gp
@@ -132,11 +131,11 @@ class GeslaDataset:
 
     def load_lat_lon_range(
         self,
-        region: Optional[Union[Polygon, MultiPolygon]] = None,
-        south_lat: Optional[float] = None,
-        north_lat: Optional[float] = None,
-        west_lon: Optional[float] = None,
-        east_lon: Optional[float] = None,
+        region: Union[Polygon, MultiPolygon] | None,
+        south_lat: float | None,
+        north_lat: float | None,
+        west_lon: float | None,
+        east_lon: float | None,
         force_xarray=False,
     ):
         """Load GESLA records within a rectangular lat/lon range into a xarray.
@@ -171,7 +170,9 @@ class GeslaDataset:
         )
 
         locations = gp.GeoDataFrame(
-            self.meta, geometry=gp.points_from_xy(self.meta.longitude, self.meta.latitude), crs="EPSG:4326"
+            self.meta,
+            geometry=gp.points_from_xy(self.meta.longitude, self.meta.latitude),
+            crs="EPSG:4326",
         )
 
         meta = self.meta.loc[locations.within(region)]

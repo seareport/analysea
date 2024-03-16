@@ -152,6 +152,7 @@ def detide(
     constituents: Dict[Any, Any] | None = None,
     resample_time: int = 30,
     chunk: int = 100000,
+    resample_detide: bool = False,
     **kwargs: Unpack[UTideArgs],
 ) -> pd.Series:
     """
@@ -161,6 +162,8 @@ def detide(
     @param constituents: constituents to be used in the analysis
     @param resample_time: resample time in minutes
     @param split_period: period in days to split the time series into (default 365)
+    @param resample_detide: (bool) resample the detided signal (for faster process)
+        default is False
     @param kwargs: keyword arguments to be passed to calc constituents ("lat"
         argument being the only one required)
     @return: reconstructed time series
@@ -170,12 +173,13 @@ def detide(
     if constituents is None:
         constituents = calc_constituents(ts=ts, resample_time=resample_time, **kwargs)
 
-    h_rsmp = ts.resample(f"{resample_time}min").apply(np.nanmean)
-    df = h_rsmp.shift(freq=f"{resample_time / 2}min")
+    if resample_detide:
+        h_rsmp = ts.resample(f"{resample_time}min").apply(np.nanmean)
+        ts = h_rsmp.shift(freq=f"{resample_time / 2}min")
 
-    for start in range(0, len(df), chunk):
-        end = min(start + chunk, len(df))
-        ts_chunk = df.iloc[start:end]
+    for start in range(0, len(ts), chunk):
+        end = min(start + chunk, len(ts))
+        ts_chunk = ts.iloc[start:end]
 
         if not ts_chunk.empty:
             tidal = utide.reconstruct(ts_chunk.index, nd_format(constituents), verbose=verbose)

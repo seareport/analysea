@@ -91,7 +91,6 @@ repos:
             "-o",
             "requirements/requirements-dev.txt",
           ]
-
   - repo: "local"
     hooks:
       - id: "mypy"

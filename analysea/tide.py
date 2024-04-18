@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 from typing import Dict
 from typing import List
@@ -9,20 +10,10 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import utide
+from typing_extensions import Unpack
 
-from analysea.utils import completeness
+from .custom_types import UTideArgs
 from analysea.utils import nd_format
-
-# tidal analysis options
-OPTS = {
-    "conf_int": "linear",
-    "constit": "auto",
-    "method": "ols",  # ols is faster and good for missing data (Ponchaut et al., 2001)
-    "order_constit": "frequency",
-    "Rayleigh_min": 0.97,
-    "lat": None,
-    "verbose": False,
-}  # careful if there is only one Nan parameter, the analysis crashes
 
 ASTRO_PLOT = [
     "M2",
@@ -71,6 +62,14 @@ ASTRO_WRITE = [
 ]
 
 
+@dataclass
+class TideAnalysisResults:
+    tide: pd.DataFrame
+    surge: pd.DataFrame
+    coefs: list[dict[str, Any]]
+    years: list[int]
+
+
 def get_const_amps_labels(
     keep: List[str], coef: Dict[Any, Any]
 ) -> Tuple[npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any]]:
@@ -113,86 +112,191 @@ def demean_amps_phases(
     return const, mean_amps, mean_phases  # ignore mypy
 
 
-def calc_constituents(ts: pd.Series, kwargs: Dict[str, Any]) -> Any:
-    # resample to 10 min for a MUCH faster analysis
-    # https://github.com/wesleybowman/UTide/issues/103
-    h_rsmp = ts.resample("10min").mean()
-    ts = h_rsmp.index
-    coef = utide.solve(ts, h_rsmp, **kwargs)
+def calc_constituents(
+    ts: pd.Series,
+    resample_time: int = 30,
+    resample_detide: bool = False,
+    **kwargs: Unpack[UTideArgs],
+) -> Any:
+    """
+    Calculate the tide constituents for a time series.
+
+    Parameters
+    ----------
+    @param ts: (pd.Series) The time series to be processed.
+    @param resample_time: (int) resample time in minutes, by default 30.
+    @param resample_detide: (bool) resample the detided signal (for faster process)
+        default is False
+    **kwargs : Dict[str, Any], optional
+        Additional keyword arguments to pass to the utide.solve function.
+        "lat" argument being the only one required.
+
+    Returns
+    -------
+    np.ndarray
+        The tide constituents.
+
+    """
+    if resample_detide:
+        # resample to 30 min for a MUCH faster analysis
+        # https://github.com/wesleybowman/UTide/issues/103
+        ts = ts.resample(f"{resample_time}min").mean()
+
+        # shifting half the sampling time to recenter the averaged signal
+        ts = ts.shift(freq=f"{resample_time / 2}min")
+    coef = utide.solve(ts.index, ts, **kwargs)
     return coef
 
 
 def detide(
     ts: pd.Series[float],
-    kwargs: Dict[str, Any],
-    constituents: dict[str, float] | None = None,
+    constituents: Dict[Any, Any] | None = None,
+    resample_time: int = 30,
+    chunk: int = 100000,
+    resample_detide: bool = False,
+    **kwargs: Unpack[UTideArgs],
 ) -> pd.Series:
+    """
+    By default this function will split the time series into yearly chunks
+
+    @param ts: (pd.Series) The time series to be processed.
+    @param constituents: (dict) constituents to be used in the analysis
+    @param resample_time: (int) resample time in minutes, by default 30.
+    @param chunk: (int) length of the chunks for splitting the time series (for faster process)
+    @param resample_detide: (bool) resample the detided signal (for faster process)
+        default is False
+    @param kwargs: keyword arguments to be passed to calc constituents ("lat"
+        argument being the only one required)
+    @return: reconstructed time series
+    """
+    verbose = kwargs.get("verbose", False)
+    result_series = []
     if constituents is None:
-        constituents = calc_constituents(ts=ts, kwargs=kwargs)
-        tidal = utide.reconstruct(ts.index, nd_format(constituents), verbose=kwargs["verbose"])
-    else:
-        tidal = utide.reconstruct(ts.index, nd_format(constituents), verbose=kwargs["verbose"])
-    storm_surge = ts - tidal.h
-    return storm_surge
+        constituents = calc_constituents(
+            ts=ts, resample_time=resample_time, resample_detide=resample_detide, **kwargs
+        )
 
+    if resample_detide:
+        ts = ts.resample(f"{resample_time}min").apply(np.nanmean)
+        ts = ts.shift(freq=f"{resample_time / 2}min")
 
-def detide_yearly(h: pd.Series[float], split_period: int, kwargs: Dict[str, Any] = OPTS) -> pd.Series:
-    log = kwargs.get("verbose", False)
+    for start in range(0, len(ts), chunk):
+        end = min(start + chunk, len(ts))
+        ts_chunk = ts.iloc[start:end]
 
-    min_time = pd.Timestamp(h.index.min())
-    max_time = pd.Timestamp(h.index.max())
-    date_ranges = pd.date_range(start=min_time, end=max_time, freq=f"{split_period}D")
-    surge = pd.DataFrame([])
-
-    for start, end in zip(date_ranges[:-1], date_ranges[1:]):
-        signal = h[start:end]
-        surge_tmp = detide(signal, kwargs)
-        if not surge_tmp.empty:
-            surge = pd.concat([surge, surge_tmp])
-        if log:
-            print(f"  => Analyse year {start.year} ({start}-{end})")
-            print(f"   +>  {len(surge)} / {len(h)} records done")
-
-    return surge
+        if not ts_chunk.empty:
+            tidal = utide.reconstruct(ts_chunk.index, nd_format(constituents), verbose=verbose)
+            storm_surge = ts_chunk - tidal.h
+            result_series.append(storm_surge)
+    return pd.concat(result_series)
 
 
 def tide_analysis(
     ts: pd.Series[float],
-    kwargs: Dict[str, Any],
-) -> Tuple[pd.DataFrame, pd.DataFrame, npt.NDArray[Any]]:
-    constituents = calc_constituents(ts=ts, kwargs=kwargs)
-    tidal = utide.reconstruct(ts.index, constituents, verbose=kwargs["verbose"])
-    return pd.DataFrame(data=tidal.h, index=ts.index), ts - tidal.h, constituents
+    resample_time: int = 30,
+    resample_detide: bool = False,
+    **kwargs: Unpack[UTideArgs],
+) -> TideAnalysisResults:
+    """
+    Perform a tide analysis on a time series.
+
+    Parameters
+    ----------
+    @param ts: (pd.Series) The time series to be processed.
+    @param resample_time: (int) resample time in minutes, by default 30.
+    @param resample_detide: (bool) resample the detided signal (for faster process)
+        default is False
+    **kwargs : Dict[str, Any], optional
+        Additional keyword arguments to pass to the utide.solve function.
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, pd.DataFrame, npt.NDArray[Any]]
+        A tuple containing the following elements:
+
+        * tide : pd.DataFrame
+            A dataframe containing the tide values.
+        * surge : pd.DataFrame
+            A dataframe containing the surge values.
+        * constituents : npt.NDArray[Any]
+            The constituents used in the analysis.
+
+    """
+    verbose = kwargs.get("verbose", False)
+    constituents = calc_constituents(
+        ts=ts, resample_time=resample_time, resample_detide=resample_detide, **kwargs
+    )
+
+    if resample_detide:
+        ts = ts.resample(f"{resample_time}min").apply(np.nanmean)
+        ts = ts.shift(freq=f"{resample_time / 2}min")
+
+    tidal = utide.reconstruct(ts.index, constituents, verbose=verbose)
+    tide = pd.Series(data=tidal.h, index=ts.index)
+    surge = pd.Series(data=ts.values - tidal.h, index=ts.index)
+    return TideAnalysisResults(
+        tide=tide.to_frame(), surge=surge.to_frame(), coefs=[constituents], years=[ts.index.year[0]]
+    )
 
 
 def yearly_tide_analysis(
-    h: pd.Series[float], split_period: int, kwargs: Dict[str, Any] = OPTS
-) -> Tuple[pd.DataFrame, pd.DataFrame, List[npt.NDArray[Any]], List[int]]:
+    h: pd.Series[float],
+    resample_time: int = 30,
+    split_period: int = 365,
+    **kwargs: Unpack[UTideArgs],
+) -> TideAnalysisResults:
+    """
+    Perform a tide analysis on a time series, split into yearly intervals.
+
+    Parameters
+    ----------
+    h : pd.Series
+        The time series to analyze.
+    resample_time : int, optional
+        The resample time in minutes, by default 30.
+    split_period : int, optional
+        The period in days to split the time series into, by default 365.
+    **kwargs : Dict[str, Any], optional
+        Additional keyword arguments to pass to the utide.solve function.
+        "lat" argument being the only one required.
+
+    Returns
+    -------
+    Tuple[pd.DataFrame, pd.DataFrame, List[npt.NDArray[Any]], List[int]]
+        A tuple containing the following elements:
+
+        * tide : pd.DataFrame
+            A dataframe containing the tide values.
+        * surge : pd.DataFrame
+            A dataframe containing the surge values.
+        * coefs : List[npt.NDArray[Any]]
+            The constituents used in the analysis for each year.
+        * years : List[int]
+            The years analyzed.
+
+    """
     log = kwargs.get("verbose", False)
 
     min_time = pd.Timestamp(h.index.min())
     max_time = pd.Timestamp(h.index.max())
     date_ranges = pd.date_range(start=min_time, end=max_time, freq=f"{split_period}D")
 
-    tide = pd.DataFrame([])
-    surge = pd.DataFrame([])
+    tide = []
+    surge = []
     coefs = []
     years = []
 
     for start, end in zip(date_ranges[:-1], date_ranges[1:]):
         signal = h[start:end]
 
-        if completeness(signal) > 70:
-            years.append(start.year)
-            tide_tmp, surge_tmp, coef = tide_analysis(signal, kwargs)
-            coefs.append(coef)
-            if not surge_tmp.empty:
-                surge = pd.concat([surge, surge_tmp])
-            if not tide_tmp.empty:
-                tide = pd.concat([tide, tide_tmp])
+        years.append(start.year)
+        ta = tide_analysis(signal, resample_time=resample_time, **kwargs)
+        coefs.append(ta.coefs[0])
+        surge.append(ta.surge)
+        tide.append(ta.tide)
 
         if log:
             print(f"  => Analyse year {start.year} ({start}-{end})")
             print(f"   +>  {len(tide)} / {len(h)} records done")
 
-    return tide, surge, coefs, years
+    return TideAnalysisResults(tide=pd.concat(tide), surge=pd.concat(surge), coefs=coefs, years=years)

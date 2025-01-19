@@ -19,6 +19,14 @@ mypy:
 test:
 	python -m pytest -vlx
 
+cov:
+	pytest --cov=analysea --cov-report term-missing --durations=10 --record-mode=none
+
+deps:
+	pre-commit run poetry-lock -a
+	pre-commit run poetry-check -a
+	pre-commit run poetry-export -a
+
 # clean_notebooks:
 # 	pre-commit run nbstripout -a
 
@@ -27,8 +35,3 @@ test:
 
 # docs:
 # 	make -C docs html
-
-deps:
-	pre-commit run poetry-lock -a
-	pre-commit run poetry-check -a
-	pre-commit run poetry-export -a

@@ -216,15 +216,16 @@ def tide_analysis(
 
     Returns
     -------
-    Tuple[pd.DataFrame, pd.DataFrame, npt.NDArray[Any]]
-        A tuple containing the following elements:
-
+    @dataclass TideAnalysisResults:
+        A class containing the following elements:
         * tide : pd.DataFrame
             A dataframe containing the tide values.
         * surge : pd.DataFrame
             A dataframe containing the surge values.
         * constituents : npt.NDArray[Any]
             The constituents used in the analysis.
+        * years : List[int]
+            The years analyzed.
 
     """
     verbose = kwargs.get("verbose", False)
@@ -242,7 +243,7 @@ def tide_analysis(
     return TideAnalysisResults(
         tide=tide.to_frame(),
         surge=surge.to_frame(),
-        coefs=[constituents],
+        coefs=constituents,
         years=[ts.index.year[0]],
     )
 
@@ -273,15 +274,14 @@ def yearly_tide_analysis(
 
     Returns
     -------
-    Tuple[pd.DataFrame, pd.DataFrame, List[npt.NDArray[Any]], List[int]]
-        A tuple containing the following elements:
-
+    @dataclass TideAnalysisResults:
+        A class containing the following elements:
         * tide : pd.DataFrame
             A dataframe containing the tide values.
         * surge : pd.DataFrame
             A dataframe containing the surge values.
-        * coefs : List[npt.NDArray[Any]]
-            The constituents used in the analysis for each year.
+        * constituents : npt.NDArray[Any]
+            The constituents used in the analysis.
         * years : List[int]
             The years analyzed.
 
@@ -290,24 +290,30 @@ def yearly_tide_analysis(
 
     min_time = pd.Timestamp(h.index.min())
     max_time = pd.Timestamp(h.index.max())
+
+    if (pd.Timestamp(max_time) - pd.Timestamp(min_time)).days < split_period:
+        return tide_analysis(h, resample_time=resample_time, resample_detide=resample_detide, **kwargs)
+
     date_ranges = pd.date_range(start=min_time, end=max_time, freq=f"{split_period}D")
 
-    tide = []
-    surge = []
-    coefs = []
-    years = []
+    if date_ranges[-1] != max_time:
+        date_ranges = date_ranges.append(pd.DatetimeIndex([max_time]))
+
+    t_ = []
+    s_ = []
+    c_ = []
+    y_ = []
 
     for start, end in zip(date_ranges[:-1], date_ranges[1:]):
         signal = h[start:end]
 
-        years.append(start.year)
+        y_.append(start.year)
         ta = tide_analysis(signal, resample_time=resample_time, resample_detide=resample_detide, **kwargs)
-        coefs.append(ta.coefs[0])
-        surge.append(ta.surge)
-        tide.append(ta.tide)
+        c_.append(ta.coefs)
+        s_.append(ta.surge)
+        t_.append(ta.tide)
 
         if log:
-            print(f"  => Analyse year {start.year} ({start}-{end})")
-            print(f"   +>  {len(tide.surge)} / {len(h)} records done")
+            print(f"  => Analyse year {start.year} - from {start} to {end})")
 
-    return TideAnalysisResults(tide=pd.concat(tide), surge=pd.concat(surge), coefs=coefs, years=years)
+    return TideAnalysisResults(tide=pd.concat(t_), surge=pd.concat(s_), coefs=c_, years=y_)

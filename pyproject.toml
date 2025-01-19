@@ -6,16 +6,20 @@ readme = "README.md"
 authors = ["Thomas Saillour <saillour.thomas@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.10"
+python = ">=3.10,<4.0"
 pandas = "*"
 ruptures = "*"
 utide = "*"
 xarray = {version = "*", extras = ["io", "accel"]}
 
 [tool.poetry.group.dev.dependencies]
+fastparquet = "*"
+ipykernel = "*"
 ipympl = "*"
 mypy = "*"
 pytest = "*"
+pytest-cov = "*"
+pytest-notebook = "*"
 
 [build-system]
 requires = ["poetry-core>=2.0.0", "setuptools>=65", "wheel"]

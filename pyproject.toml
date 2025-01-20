@@ -2,35 +2,27 @@
 name = "analysea"
 version = "0.1.0"
 description = ""
-authors = ["Thomas Saillour <saillour.thomas@gmail.com>"]
 readme = "README.md"
+authors = ["Thomas Saillour <saillour.thomas@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.12"
-cartopy = "*"
-dask = {version = "*", extras = ["complete"]}
-geopandas = "*"
-matplotlib = "*"
-observer = {git = "https://github.com/seareport/observer.git"}
+python = ">=3.10,<4.0"
 pandas = "*"
-pyposeidon = {git = "https://github.com/ec-jrc/pyPoseidon.git"}
 ruptures = "*"
-scikit-image = "*"
-searvey = "*"
-shapely = "*"
-thalassa = "*"
 utide = "*"
 xarray = {version = "*", extras = ["io", "accel"]}
 
 [tool.poetry.group.dev.dependencies]
+fastparquet = "*"
 ipykernel = "*"
 ipympl = "*"
-jupyter-bokeh = "*"
 mypy = "*"
 pytest = "*"
+pytest-cov = "*"
+pytest-notebook = "*"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=2.0.0", "setuptools>=65", "wheel"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
@@ -51,7 +43,6 @@ target-version = ['py310']
 
 [tool.mypy]
 python_version = "3.10"
-plugins = ["pydantic.mypy"]
 show_error_codes = true
 show_column_numbers = true
 show_error_context = true

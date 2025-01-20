@@ -4,6 +4,7 @@ import itertools
 from typing import Any
 from typing import cast
 from typing import Dict
+from typing import Iterator
 from typing import Optional
 from typing import Tuple
 from typing import Union
@@ -20,6 +21,41 @@ from analysea.spikes import remove_outliers
 # ===================
 # TIME SERIES
 # ===================
+def resample(df: pd.DataFrame, t_rsp: int = 30) -> pd.DataFrame:
+    """
+    Resample a pandas dataframe to a new time interval.
+
+    @param df (pd.DataFrame): The input dataframe.
+    @param t_rsp (int): optional, The target resample period in minutes
+    by default 30.
+
+    @returns (pd.DataFrame): The resampled dataframe.
+    """
+    ts = df.resample(f"{t_rsp}min").mean().shift(freq=f"{int(t_rsp/2)}min")
+    return ts
+
+
+def interpolate(df: pd.DataFrame, t_rsp: int = 30) -> pd.DataFrame:
+    """
+    This function resamples a pandas dataframe to a new time interval
+    using linear interpolation.
+
+    It uses analysea's detect_time_step function to interpolate only
+    between holes in the data and not extrapolate "flat areas" in the
+    signal
+
+    @param df (pd.DataFrame): The input dataframe.
+    @param t_rsp (int): optional, The target resample period in minutes
+    by default 30.
+
+    @returns (pd.DataFrame): The interpolated dataframe.
+    """
+    time_step = detect_time_step(df)
+    n_interp = int(t_rsp * 60 / time_step.total_seconds())
+    ts = df.interpolate(method="linear", limit=n_interp)
+    return ts
+
+
 def detect_splits(sr: pd.Series, max_gap: pd.Timedelta) -> pd.DatetimeIndex:
     split_points = pd.DatetimeIndex([sr.index[0], sr.index[-1]])
     condition = sr.index.to_series().diff() > max_gap
@@ -28,7 +64,15 @@ def detect_splits(sr: pd.Series, max_gap: pd.Timedelta) -> pd.DatetimeIndex:
     return split_points
 
 
-def split_series(sr: pd.Series, max_gap: pd.Timedelta = pd.Timedelta(hours=24)) -> pd.Series:
+def split_series(sr: pd.Series, max_gap: pd.Timedelta = pd.Timedelta(hours=24)) -> Iterator[pd.Series]:
+    """
+    Splits a pandas series into segments without overlapping gaps larger than max_gap.
+
+    @param sr (pd.Series): The input series.
+    @param max_gap (pd.Timedelta): The maximum allowed gap between two segments.
+
+    @returns: Iterator[pd.Series]: An iterator of segments.
+    """
     for start, stop in itertools.pairwise(detect_splits(sr=sr, max_gap=max_gap)):
         segment = sr[start:stop]
         yield segment[:-1]
@@ -63,12 +107,32 @@ def calc_stats(segments: list[pd.Series]) -> pd.DataFrame:
 
 def cleanup(
     ts: pd.Series,
+    clip_limits: Optional[Tuple[float, float]] = None,
+    kurtosis: float = 2.0,
+    remove_flats: bool = False,
     despike: bool = True,
     demean: bool = True,
-    clip_limits: Optional[tuple[float, float]] = None,
-    kurtosis: Optional[float] = 2.0,
-    remove_flats: Optional[bool] = False,
 ) -> pd.DataFrame:
+    """
+    This function cleans up a time series by removing outliers,
+    detecting and removing flat areas, and removing steps.
+
+    @param ts (pd.Series): The input time series.
+    @param clip_limits tuple[float, float]: Optional, The lower and upper
+      bounds for outlier detection. If None, outlier detection is not performed.
+    @param kurtosis (float): The threshold for detecting outliers. If the absolute
+      value of the kurtosis of a segment is less than this value, the segment is
+      considered clean.
+    @param remove_flats (bool): Whether to remove flat areas from the time series.
+      If True, flat areas are detected by comparing the difference in consecutive values.
+    @param despike (bool): Whether to remove outliers using the provided clip_limits.
+      If True and clip_limits is not None, outlier detection is performed.
+    @param demean (bool): Whether to demean the time series.
+      If True, the mean of the time series is subtracted from each value.
+
+    @returns (pd.DataFrame): The cleaned up time series.
+
+    """
     # Check if the input is empty
     if ts.empty:
         return pd.DataFrame()
@@ -182,7 +246,9 @@ def correlation(x: npt.NDArray[Any], y: npt.NDArray[Any]) -> Any:
 
 
 def shift_for_maximum_correlation(
-    x: npt.NDArray[Any], y: npt.NDArray[Any], time: npt.NDArray[Any]
+    x: npt.NDArray[Any],
+    y: npt.NDArray[Any],
+    time: npt.NDArray[Any],
 ) -> Tuple[npt.NDArray[Any], npt.NDArray[Any], npt.NDArray[Any]]:
     correlation = correlate(x, y)
     lags = correlation_lags(x.size, y.size)

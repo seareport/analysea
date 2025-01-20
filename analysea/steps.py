@@ -8,8 +8,6 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import ruptures as rpt
-from scipy import interpolate
-from skimage.restoration import denoise_tv_chambolle
 
 from analysea.utils import detect_time_step
 
@@ -18,7 +16,9 @@ from analysea.utils import detect_time_step
 # STEP FUNCTIONS
 # ===================
 def step_function_ruptures(
-    df: pd.DataFrame, penalty: int = 10, subsampHours: int = 3
+    df: pd.DataFrame,
+    penalty: int = 10,
+    subsampHours: int = 3,
 ) -> Tuple[pd.DataFrame, npt.NDArray[Any], List[int]]:
     """
     from the ruptures package
@@ -69,18 +69,3 @@ def remove_steps_simple(df: pd.DataFrame, threshold: float) -> Tuple[pd.DataFram
         step = df.interpolate().iloc[stepx : steps_ix[i + 1]].mean()
         step_function.iloc[stepx : steps_ix[i + 1]] = step
     return step_function, steps_ix
-
-
-def step_function_TV(df: pd.DataFrame, weight: float = 1) -> Tuple[pd.DataFrame, npt.NDArray[Any]]:
-    idx = range(0, len(df), 200)
-    signal = np.array(df.interpolate())[idx]
-    # adjust the parameters
-    signal_denoise = denoise_tv_chambolle(signal, weight=weight)  # type: ignore[no-untyped-call]
-    # x_step = -2*np.cumsum(signal_denoise)
-    # step_indicator = x_step == x_step.max()
-    f = interpolate.interp1d(
-        idx, signal_denoise, fill_value="extrapolate"
-    )  # for extrapolation in last scipy version
-    res = pd.Series(data=f(range(len(df))), index=df.index)
-    #
-    return remove_steps_simple(res, res.std())

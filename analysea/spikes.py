@@ -13,7 +13,7 @@ def despike_prominence(df: pd.DataFrame, prominence: float) -> Tuple[Any, Any, p
     input:
     @df: pd.Series
     @prominence: prominence of the spike: https://en.wikipedia.org/wiki/Topographic_prominence
-    (recommandation: prominence = 3 * std. dev.: https://doi.org/10.3390/rs12233970 )
+    (recommendation: prominence = 3 * std. dev.: https://doi.org/10.3390/rs12233970 )
 
     output:
     @ipeaks: peaks indexes

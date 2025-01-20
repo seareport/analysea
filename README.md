@@ -1,6 +1,6 @@
 # ANALYSEA
 
-Broad set of routines to clean, process and visuaise metocean conditions:
+Broad set of routines to clean, process and visualise metocean conditions:
 
 - free surface,
 - tides (using [utide](https://github.com/wesleybowman/UTide))
